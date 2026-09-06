@@ -1,1 +1,11 @@
 _docs/*
+
+# Gradle / Kotlin build artifacts and caches
+.gradle/
+.kotlin/
+build/
+kotlin-js-store/
+*.log
+
+# Local env
+.env
