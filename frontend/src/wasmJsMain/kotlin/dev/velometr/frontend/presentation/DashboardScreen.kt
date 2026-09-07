@@ -2,7 +2,6 @@ package dev.velometr.frontend.presentation
 
 import dev.velometr.frontend.data.ActivityDto
 import dev.velometr.frontend.data.ApiClient
-import dev.velometr.frontend.data.UnauthorizedException
 import dev.velometr.frontend.data.YearSummaryDto
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -25,6 +24,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
@@ -36,6 +36,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -43,40 +44,14 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.currentCoroutineContext
-import kotlinx.coroutines.ensureActive
 
 /** Below this content width the layout switches to the mockup's mobile arrangement (single-column trip grid, stacked header). */
 private val NARROW_BREAKPOINT = 620.dp
 
 @Composable
 fun DashboardScreen(api: ApiClient, onLoggedOut: () -> Unit) {
-    var year by remember { mutableStateOf(currentYear()) }
-    var data by remember(year) { mutableStateOf<DashboardData?>(null) }
-    var loadError by remember(year) { mutableStateOf(false) }
-    var refreshVersion by remember { mutableStateOf(0) }
-    var showImportModal by remember { mutableStateOf(false) }
-    LaunchedEffect(year, refreshVersion) {
-        val requestedYear = year
-        loadError = false
-        try {
-            val loaded = DashboardData(
-                api.yearSummary(requestedYear),
-                api.weeklyDistances(requestedYear).weeks,
-                api.activities(requestedYear),
-            )
-            currentCoroutineContext().ensureActive()
-            data = loaded
-        } catch (e: CancellationException) {
-            throw e
-        } catch (e: UnauthorizedException) {
-            api.logout()
-            onLoggedOut()
-        } catch (e: Exception) {
-            loadError = true
-        }
-    }
+    val scope = rememberCoroutineScope()
+    val viewModel = remember { DashboardViewModel(api, scope, onLoggedOut) }
 
     Box(Modifier.fillMaxSize().background(VelometrColors.background)) {
         BoxWithConstraints(modifier = Modifier.align(Alignment.TopCenter).widthIn(max = 900.dp).fillMaxWidth()) {
@@ -88,17 +63,17 @@ fun DashboardScreen(api: ApiClient, onLoggedOut: () -> Unit) {
                     .padding(if (isNarrow) 16.dp else 24.dp),
             ) {
                 DashboardHeader(
-                    year = year,
+                    year = viewModel.year,
                     isNarrow = isNarrow,
-                    onYearChange = { year = it },
-                    onImportClick = { showImportModal = true },
+                    onYearChange = viewModel::setYear,
+                    onImportClick = viewModel::openImportModal,
                 )
                 Spacer(Modifier.height(24.dp))
-                if (loadError) {
+                if (viewModel.loadError) {
                     Text("Не удалось загрузить данные", color = VelometrColors.accent)
-                    TextButton(onClick = { refreshVersion++ }) { Text("Повторить") }
+                    TextButton(onClick = viewModel::retry) { Text("Повторить") }
                 }
-                data?.let { loaded ->
+                viewModel.data?.let { loaded ->
                     HeroBlock(loaded.summary, isNarrow)
                     Spacer(Modifier.height(24.dp))
                     WeeklyChart(loaded.weeks)
@@ -108,30 +83,14 @@ fun DashboardScreen(api: ApiClient, onLoggedOut: () -> Unit) {
             }
         }
 
-        if (showImportModal) {
+        if (viewModel.showImportModal) {
             ImportModal(
-                onClose = { showImportModal = false },
-                onImport = { bytes, filename ->
-                    try {
-                        api.importZip(bytes, filename)
-                        showImportModal = false
-                        refreshVersion++
-                    } catch (e: UnauthorizedException) {
-                        api.logout()
-                        showImportModal = false
-                        onLoggedOut()
-                    }
-                },
+                onClose = viewModel::closeImportModal,
+                onImport = viewModel::importZip,
             )
         }
     }
 }
-
-private data class DashboardData(
-    val summary: YearSummaryDto,
-    val weeks: List<Double>,
-    val activities: List<ActivityDto>,
-)
 
 @Composable
 private fun DashboardHeader(year: Int, isNarrow: Boolean, onYearChange: (Int) -> Unit, onImportClick: () -> Unit) {
@@ -337,45 +296,47 @@ private fun TripList(activities: List<ActivityDto>, isNarrow: Boolean) {
 
 @Composable
 private fun TripCard(activity: ActivityDto, isPeak: Boolean, modifier: Modifier = Modifier) {
-    Row(
-        modifier = modifier
-            .background(VelometrColors.panel, RoundedCornerShape(10.dp))
-            .padding(vertical = 16.dp, horizontal = 18.dp),
-    ) {
-        Box(
-            Modifier
-                .width(3.dp)
-                .fillMaxHeight()
-                .background(if (isPeak) VelometrColors.accent else VelometrColors.contour),
-        )
-        Spacer(Modifier.width(14.dp))
-        Column(Modifier.fillMaxWidth()) {
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                Column {
-                    Text(activity.title ?: "Поездка", color = VelometrColors.text, fontSize = 14.sp)
-                    Spacer(Modifier.height(4.dp))
+    SelectionContainer {
+        Row(
+            modifier = modifier
+                .background(VelometrColors.panel, RoundedCornerShape(10.dp))
+                .padding(vertical = 16.dp, horizontal = 18.dp),
+        ) {
+            Box(
+                Modifier
+                    .width(3.dp)
+                    .fillMaxHeight()
+                    .background(if (isPeak) VelometrColors.accent else VelometrColors.contour),
+            )
+            Spacer(Modifier.width(14.dp))
+            Column(Modifier.fillMaxWidth()) {
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                    Column {
+                        Text(activity.title ?: "Поездка", color = VelometrColors.text, fontSize = 14.sp)
+                        Spacer(Modifier.height(4.dp))
+                        Text(
+                            formatShortDate(activity.date),
+                            color = VelometrColors.textFaint,
+                            fontSize = 12.sp,
+                            fontFamily = FontFamily.Monospace,
+                        )
+                    }
                     Text(
-                        formatShortDate(activity.date),
-                        color = VelometrColors.textFaint,
-                        fontSize = 12.sp,
+                        "${formatOneDecimal(activity.distanceKm)} км",
+                        color = VelometrColors.text,
+                        fontSize = 20.sp,
+                        fontWeight = FontWeight.SemiBold,
                         fontFamily = FontFamily.Monospace,
                     )
                 }
-                Text(
-                    "${formatOneDecimal(activity.distanceKm)} км",
-                    color = VelometrColors.text,
-                    fontSize = 20.sp,
-                    fontWeight = FontWeight.SemiBold,
-                    fontFamily = FontFamily.Monospace,
-                )
-            }
-            Spacer(Modifier.height(12.dp))
-            HorizontalDivider(color = VelometrColors.line)
-            Spacer(Modifier.height(12.dp))
-            Row(horizontalArrangement = Arrangement.spacedBy(22.dp)) {
-                TripStat(formatDuration(activity.durationSec), "длительность")
-                TripStat(formatSpeed(activity.avgSpeed), "ср. скорость, км/ч")
-                TripStat(formatSpeed(activity.maxSpeed), "макс. скорость, км/ч")
+                Spacer(Modifier.height(12.dp))
+                HorizontalDivider(color = VelometrColors.line)
+                Spacer(Modifier.height(12.dp))
+                Row(horizontalArrangement = Arrangement.spacedBy(22.dp)) {
+                    TripStat(formatDuration(activity.durationSec), "длительность")
+                    TripStat(formatSpeed(activity.avgSpeed), "ср. скорость, км/ч")
+                    TripStat(formatSpeed(activity.maxSpeed), "макс. скорость, км/ч")
+                }
             }
         }
     }
