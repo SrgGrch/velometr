@@ -1,7 +1,7 @@
 package dev.velometr.frontend.presentation
 
 import kotlin.math.roundToLong
-import kotlinx.datetime.Clock
+import kotlin.time.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.todayIn
 
@@ -9,6 +9,7 @@ private val MONTHS_SHORT = listOf(
     "янв", "фев", "мар", "апр", "май", "июн", "июл", "авг", "сен", "окт", "ноя", "дек",
 )
 
+@OptIn(kotlin.time.ExperimentalTime::class)
 fun currentYear(): Int = Clock.System.todayIn(TimeZone.currentSystemDefault()).year
 
 /** One decimal place with thousands grouping, e.g. 1842.37 -> "1 842.4". */

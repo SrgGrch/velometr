@@ -1,4 +1,10 @@
 FROM eclipse-temurin:21-jdk-jammy AS build
+
+# Kotlin/Wasm's bundled Node.js binary requires libatomic1, which isn't in
+# the base JDK image.
+RUN apt-get update && apt-get install -y --no-install-recommends libatomic1 \
+    && rm -rf /var/lib/apt/lists/*
+
 WORKDIR /workspace
 COPY gradlew gradlew.bat settings.gradle.kts build.gradle.kts gradle.properties ./
 COPY gradle ./gradle
