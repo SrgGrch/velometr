@@ -1,5 +1,7 @@
-package dev.velometr.backend
+package dev.velometr.backend.data
 
+import dev.velometr.backend.domain.InvalidArchiveException
+import dev.velometr.backend.domain.ParsedActivity
 import org.apache.commons.csv.CSVFormat
 import org.apache.commons.csv.CSVParser
 import org.apache.commons.csv.CSVRecord

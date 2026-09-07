@@ -1,5 +1,13 @@
-package dev.velometr.backend
+package dev.velometr.backend.presentation
 
+import dev.velometr.backend.AppConfig
+import dev.velometr.backend.data.ActivityRepository
+import dev.velometr.backend.domain.ImportService
+import dev.velometr.backend.domain.InvalidArchiveException
+import dev.velometr.backend.domain.JwtService
+import dev.velometr.backend.domain.LoginRequest
+import dev.velometr.backend.domain.LoginResponse
+import dev.velometr.backend.domain.WeeklyDistanceDto
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.content.PartData
 import io.ktor.http.content.forEachPart

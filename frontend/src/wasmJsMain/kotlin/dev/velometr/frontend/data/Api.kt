@@ -1,4 +1,4 @@
-package dev.velometr.frontend
+package dev.velometr.frontend.data
 
 import kotlinx.serialization.Serializable
 

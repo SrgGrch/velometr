@@ -1,5 +1,6 @@
-package dev.velometr.frontend
+package dev.velometr.frontend.presentation
 
+import dev.velometr.frontend.data.ImportException
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable

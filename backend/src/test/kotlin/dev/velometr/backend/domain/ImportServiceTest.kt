@@ -1,5 +1,7 @@
-package dev.velometr.backend
+package dev.velometr.backend.domain
 
+import dev.velometr.backend.data.ActivityRepository
+import dev.velometr.backend.data.Database
 import java.io.File
 import java.nio.file.Files
 import java.util.zip.GZIPInputStream

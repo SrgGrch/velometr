@@ -1,4 +1,4 @@
-package dev.velometr.backend
+package dev.velometr.backend.domain
 
 import com.auth0.jwt.JWT
 import com.auth0.jwt.algorithms.Algorithm

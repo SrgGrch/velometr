@@ -1,5 +1,6 @@
-package dev.velometr.frontend
+package dev.velometr.frontend.presentation
 
+import dev.velometr.frontend.data.ApiClient
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box

@@ -1,4 +1,4 @@
-package dev.velometr.backend
+package dev.velometr.backend.data
 
 import kotlin.test.Test
 import kotlin.test.assertEquals

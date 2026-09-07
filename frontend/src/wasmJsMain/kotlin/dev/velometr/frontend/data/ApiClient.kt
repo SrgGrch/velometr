@@ -1,4 +1,4 @@
-package dev.velometr.frontend
+package dev.velometr.frontend.data
 
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body

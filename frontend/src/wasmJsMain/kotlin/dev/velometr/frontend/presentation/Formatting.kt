@@ -1,4 +1,4 @@
-package dev.velometr.frontend
+package dev.velometr.frontend.presentation
 
 import kotlin.math.roundToLong
 import kotlinx.datetime.Clock

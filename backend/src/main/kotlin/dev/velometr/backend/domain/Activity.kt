@@ -1,4 +1,4 @@
-package dev.velometr.backend
+package dev.velometr.backend.domain
 
 import kotlinx.serialization.Serializable
 

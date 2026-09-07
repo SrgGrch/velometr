@@ -1,5 +1,6 @@
-package dev.velometr.backend
+package dev.velometr.backend.data
 
+import dev.velometr.backend.domain.ParsedActivity
 import java.nio.file.Files
 import kotlin.test.Test
 import kotlin.test.assertEquals

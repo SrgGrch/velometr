@@ -1,4 +1,4 @@
-package dev.velometr.backend
+package dev.velometr.backend.data
 
 import java.io.File
 import java.sql.Connection

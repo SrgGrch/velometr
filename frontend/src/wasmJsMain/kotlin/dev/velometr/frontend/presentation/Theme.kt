@@ -1,4 +1,4 @@
-package dev.velometr.frontend
+package dev.velometr.frontend.presentation
 
 import androidx.compose.ui.graphics.Color
 

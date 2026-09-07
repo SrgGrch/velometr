@@ -1,5 +1,12 @@
 package dev.velometr.backend
 
+import dev.velometr.backend.data.ActivityRepository
+import dev.velometr.backend.data.Database
+import dev.velometr.backend.domain.ImportService
+import dev.velometr.backend.domain.JwtService
+import dev.velometr.backend.presentation.activityRoutes
+import dev.velometr.backend.presentation.importRoutes
+import dev.velometr.backend.presentation.loginRoutes
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
 import io.ktor.server.application.install

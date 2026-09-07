@@ -1,5 +1,9 @@
-package dev.velometr.frontend
+package dev.velometr.frontend.presentation
 
+import dev.velometr.frontend.data.ActivityDto
+import dev.velometr.frontend.data.ApiClient
+import dev.velometr.frontend.data.UnauthorizedException
+import dev.velometr.frontend.data.YearSummaryDto
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll

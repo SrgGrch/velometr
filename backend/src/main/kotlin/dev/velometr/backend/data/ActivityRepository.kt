@@ -1,5 +1,8 @@
-package dev.velometr.backend
+package dev.velometr.backend.data
 
+import dev.velometr.backend.domain.ActivityDto
+import dev.velometr.backend.domain.ParsedActivity
+import dev.velometr.backend.domain.YearSummaryDto
 import kotlinx.serialization.Serializable
 import java.sql.Types
 import java.time.LocalDateTime
