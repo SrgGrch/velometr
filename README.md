@@ -109,7 +109,7 @@ DATA_PATH=/data/velometr.db
 
 ## Разработка
 
-Стек: **Kotlin 2.1.20**, **Ktor 3.1.3**, **Compose Multiplatform 1.8.0 / Kotlin/Wasm**, **SQLite**, **nginx**. Gradle Wrapper включён в репозиторий.
+Стек: **Kotlin 2.4.20**, **Ktor 3.1.3**, **Compose Multiplatform 1.12.0 / Kotlin/Wasm**, **SQLite**, **nginx**. Gradle Wrapper 8.14.4 включён в репозиторий.
 
 ### Через Docker Compose
 
@@ -120,6 +120,10 @@ FRONTEND_BUILD_MODE=development
 ```
 
 Затем выполните `docker compose up -d --build`. Этот режим пропускает оптимизации Kotlin/Wasm и минификацию. Для развёртывания используйте `production`.
+
+BuildKit сохраняет зависимости Gradle, историю задач и промежуточные результаты между Docker-сборками. Команда `docker compose up -d --build` остаётся прежней: первая сборка заполняет кеши, последующие используют их при пересборке изменённых исходников. Backend и frontend используют отдельные кеши. Локальная сборка без Docker с ними не связана.
+
+Кеши принадлежат Docker builder и не входят в итоговые образы. `docker compose down` их не удаляет; очистка кешей builder или автоматическая сборка мусора может удалить их, после чего сборка заполнит их заново. Production-оптимизация Kotlin/Wasm и webpack может оставаться затратной даже с прогретыми кешами.
 
 ### Backend без Docker
 
