@@ -108,7 +108,7 @@ class ApplicationTest {
         val weekly = client.get("/api/stats/2026/weekly") { header(HttpHeaders.Authorization, "Bearer $token") }
         assertEquals(HttpStatusCode.OK, weekly.status)
         val weeklyDto = Json.decodeFromString<WeeklyDistanceDto>(weekly.bodyAsText())
-        assertEquals(52, weeklyDto.weeks.size)
+        assertEquals(53, weeklyDto.weeks.size)
         assertEquals(50.0, weeklyDto.weeks.sum(), 1e-9)
 
         val list = client.get("/api/activities?year=2026") { header(HttpHeaders.Authorization, "Bearer $token") }

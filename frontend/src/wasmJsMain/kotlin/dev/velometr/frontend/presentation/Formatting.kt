@@ -2,8 +2,13 @@ package dev.velometr.frontend.presentation
 
 import kotlin.math.roundToLong
 import kotlin.time.Clock
+import kotlinx.datetime.DateTimeUnit
 import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
+import kotlinx.datetime.daysUntil
+import kotlinx.datetime.isoDayNumber
+import kotlinx.datetime.minus
+import kotlinx.datetime.plus
 import kotlinx.datetime.todayIn
 
 private val MONTHS_SHORT = listOf(
@@ -41,10 +46,29 @@ fun formatDuration(seconds: Long): String {
 
 fun formatSpeed(kmh: Double?): String = if (kmh == null) "-" else formatOneDecimal(kmh)
 
-/** Which of the dashboard's 52 fixed 7-day week-buckets (0-based) a date falls into - mirrors the backend's ActivityRepository.weeklyDistances bucketing, so trip-list grouping lines up with the weekly chart. */
+/** Which Monday-Sunday calendar week (0-based, week 0 starting Jan 1) a date falls into -
+ * mirrors the backend's ActivityRepository.weeklyDistances bucketing, so trip-list grouping
+ * lines up with the weekly chart. */
 fun weekIndexOf(isoDateTime: String): Int {
-    val dayOfYear = LocalDate.parse(isoDateTime.substringBefore('T')).dayOfYear
-    return minOf(51, (dayOfYear - 1) / 7)
+    val date = LocalDate.parse(isoDateTime.substringBefore('T'))
+    val jan1 = LocalDate(date.year, 1, 1)
+    val firstMonday = jan1.minus(jan1.dayOfWeek.isoDayNumber - 1, DateTimeUnit.DAY)
+    return firstMonday.daysUntil(date) / 7
+}
+
+/** Date range of the given calendar week (0-based, mirrors [weekIndexOf]), clipped to
+ * [year]'s own days - e.g. "18 - 24 авг", or a single date for a one-day partial week. */
+fun weekRangeLabel(year: Int, weekIndex: Int): String {
+    val jan1 = LocalDate(year, 1, 1)
+    val dec31 = LocalDate(year, 12, 31)
+    val firstMonday = jan1.minus(jan1.dayOfWeek.isoDayNumber - 1, DateTimeUnit.DAY)
+    val weekStart = maxOf(jan1, firstMonday.plus(weekIndex * 7, DateTimeUnit.DAY))
+    val weekEnd = minOf(dec31, firstMonday.plus(weekIndex * 7 + 6, DateTimeUnit.DAY))
+    return if (weekStart == weekEnd) {
+        formatShortDate(weekStart.toString())
+    } else {
+        "${formatShortDate(weekStart.toString())} - ${formatShortDate(weekEnd.toString())}"
+    }
 }
 
 /** ISO local date-time -> "d mmm" (e.g. "5 сен") */

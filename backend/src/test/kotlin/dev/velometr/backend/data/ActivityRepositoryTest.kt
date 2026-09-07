@@ -112,27 +112,30 @@ class ActivityRepositoryTest {
     }
 
     @Test
-    fun `weekly distances for a year with no activities is 52 zero buckets`() {
+    fun `weekly distances for a year with no activities is all zero buckets`() {
         val path = tempDbPath()
         Database.migrate(path)
         val repository = ActivityRepository(path)
 
+        // 2030-01-01 is a Tuesday, so the Monday-anchored grid needs a 53rd bucket
+        // to cover the partial last week.
         val weeks = repository.weeklyDistances(2030)
 
-        assertEquals(52, weeks.size)
+        assertEquals(53, weeks.size)
         assertTrue(weeks.all { it == 0.0 })
     }
 
     @Test
-    fun `weekly distances bucket activities by 7-day week and fold the year-end remainder into the last bucket`() {
+    fun `weekly distances bucket activities by real calendar week and fold the year-end remainder into the last bucket`() {
         val path = tempDbPath()
         Database.migrate(path)
         val repository = ActivityRepository(path)
         repository.importBatch(
             listOf(
-                sampleActivity(1L, distanceKm = 5.0).copy(date = "2026-01-01T00:00:00") to null, // day 1 -> week 0
-                sampleActivity(2L, distanceKm = 7.0).copy(date = "2026-01-08T00:00:00") to null, // day 8 -> week 1
-                sampleActivity(3L, distanceKm = 9.0).copy(date = "2026-12-31T00:00:00") to null, // day 365 -> week 51
+                // 2026-01-01 is a Thursday, so week 0 is the partial week Jan 1-4.
+                sampleActivity(1L, distanceKm = 5.0).copy(date = "2026-01-01T00:00:00") to null, // week 0
+                sampleActivity(2L, distanceKm = 7.0).copy(date = "2026-01-08T00:00:00") to null, // week 1
+                sampleActivity(3L, distanceKm = 9.0).copy(date = "2026-12-31T00:00:00") to null, // week 52 (last)
             )
         )
 
@@ -140,7 +143,27 @@ class ActivityRepositoryTest {
 
         assertEquals(5.0, weeks[0], 1e-9)
         assertEquals(7.0, weeks[1], 1e-9)
-        assertEquals(9.0, weeks[51], 1e-9)
+        assertEquals(9.0, weeks[52], 1e-9)
+    }
+
+    @Test
+    fun `weekly distances split a week straddling two years between each year's own bucket`() {
+        val path = tempDbPath()
+        Database.migrate(path)
+        val repository = ActivityRepository(path)
+        repository.importBatch(
+            listOf(
+                // 2025-12-29 (Mon) - 2026-01-04 (Sun) is one calendar week straddling the year boundary.
+                sampleActivity(1L, distanceKm = 4.0).copy(date = "2025-12-30T00:00:00") to null,
+                sampleActivity(2L, distanceKm = 6.0).copy(date = "2026-01-02T00:00:00") to null,
+            )
+        )
+
+        val weeks2025 = repository.weeklyDistances(2025)
+        val weeks2026 = repository.weeklyDistances(2026)
+
+        assertEquals(4.0, weeks2025.last(), 1e-9)
+        assertEquals(6.0, weeks2026[0], 1e-9)
     }
 
     @Test

@@ -5,7 +5,11 @@ import dev.velometr.backend.domain.ParsedActivity
 import dev.velometr.backend.domain.YearSummaryDto
 import kotlinx.serialization.Serializable
 import java.sql.Types
+import java.time.DayOfWeek
+import java.time.LocalDate
 import java.time.LocalDateTime
+import java.time.temporal.ChronoUnit
+import java.time.temporal.TemporalAdjusters
 
 @Serializable
 data class ImportStats(val imported: Int, val skipped: Int, val total: Int)
@@ -105,13 +109,18 @@ class ActivityRepository(private val dataPath: String) {
         )
     }
 
-    /** 52 fixed 7-day buckets across the calendar year; the trailing days of a leap
-     * year fold into the last bucket, matching the dashboard's fixed 52-bar chart. */
+    /** Real Monday-Sunday calendar weeks. Week 0 starts on Jan 1 itself (so it's
+     * partial unless Jan 1 is a Monday), and the last week is likewise partial if
+     * Dec 31 isn't a Sunday. A week straddling Dec 31/Jan 1 is never merged: since
+     * [listYear] only returns rows dated within [year], each year's own share of
+     * that shared week lands in its own bucket (last of one year, first of the next). */
     fun weeklyDistances(year: Int): List<Double> {
-        val weeks = DoubleArray(52)
+        val firstMonday = LocalDate.of(year, 1, 1).with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+        val weekCount = (ChronoUnit.DAYS.between(firstMonday, LocalDate.of(year, 12, 31)) / 7).toInt() + 1
+        val weeks = DoubleArray(weekCount)
         for (row in listYear(year)) {
-            val dayOfYear = LocalDateTime.parse(row.date).dayOfYear
-            val weekIndex = minOf(51, (dayOfYear - 1) / 7)
+            val date = LocalDateTime.parse(row.date).toLocalDate()
+            val weekIndex = (ChronoUnit.DAYS.between(firstMonday, date) / 7).toInt()
             weeks[weekIndex] += row.distanceKm
         }
         return weeks.toList()

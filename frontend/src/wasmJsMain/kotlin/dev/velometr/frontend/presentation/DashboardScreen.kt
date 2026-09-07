@@ -76,7 +76,7 @@ fun DashboardScreen(api: ApiClient, onLoggedOut: () -> Unit) {
                 viewModel.data?.let { loaded ->
                     HeroBlock(loaded.summary, isNarrow)
                     Spacer(Modifier.height(24.dp))
-                    WeeklyChart(loaded.weeks)
+                    WeeklyChart(loaded.weeks, viewModel.year)
                     Spacer(Modifier.height(30.dp))
                     TripList(loaded.activities, isNarrow)
                 }
@@ -200,7 +200,7 @@ private val MONTH_LABELS = listOf(
 )
 
 @Composable
-private fun WeeklyChart(weeks: List<Double>) {
+private fun WeeklyChart(weeks: List<Double>, year: Int) {
     val max = (weeks.maxOrNull() ?: 0.0).coerceAtLeast(0.001)
     val scrollState = rememberScrollState()
     var selectedWeek by remember(weeks) { mutableStateOf<Int?>(null) }
@@ -220,7 +220,7 @@ private fun WeeklyChart(weeks: List<Double>) {
         ) {
             Text("Пробег по неделям", color = VelometrColors.textMuted, fontSize = 14.sp)
             Text(
-                text = activeWeek?.let { "Неделя ${it + 1} · ${formatOneDecimal(weeks[it])} км" }.orEmpty(),
+                text = activeWeek?.let { "${weekRangeLabel(year, it)} · ${formatOneDecimal(weeks[it])} км" }.orEmpty(),
                 color = VelometrColors.text,
                 fontFamily = FontFamily.Monospace,
                 fontSize = 13.sp,
