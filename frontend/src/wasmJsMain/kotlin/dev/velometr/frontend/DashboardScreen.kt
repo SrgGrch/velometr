@@ -32,7 +32,6 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -40,7 +39,9 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import kotlinx.coroutines.launch
+import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.currentCoroutineContext
+import kotlinx.coroutines.ensureActive
 
 /** Below this content width the layout switches to the mockup's mobile arrangement (single-column trip grid, stacked header). */
 private val NARROW_BREAKPOINT = 620.dp
@@ -48,24 +49,30 @@ private val NARROW_BREAKPOINT = 620.dp
 @Composable
 fun DashboardScreen(api: ApiClient, onLoggedOut: () -> Unit) {
     var year by remember { mutableStateOf(currentYear()) }
-    var summary by remember { mutableStateOf<YearSummaryDto?>(null) }
-    var weeks by remember { mutableStateOf<List<Double>>(emptyList()) }
-    var activities by remember { mutableStateOf<List<ActivityDto>>(emptyList()) }
+    var data by remember(year) { mutableStateOf<DashboardData?>(null) }
+    var loadError by remember(year) { mutableStateOf(false) }
+    var refreshVersion by remember { mutableStateOf(0) }
     var showImportModal by remember { mutableStateOf(false) }
-    val scope = rememberCoroutineScope()
-
-    suspend fun reload(y: Int) {
+    LaunchedEffect(year, refreshVersion) {
+        val requestedYear = year
+        loadError = false
         try {
-            summary = api.yearSummary(y)
-            weeks = api.weeklyDistances(y).weeks
-            activities = api.activities(y)
+            val loaded = DashboardData(
+                api.yearSummary(requestedYear),
+                api.weeklyDistances(requestedYear).weeks,
+                api.activities(requestedYear),
+            )
+            currentCoroutineContext().ensureActive()
+            data = loaded
+        } catch (e: CancellationException) {
+            throw e
         } catch (e: UnauthorizedException) {
             api.logout()
             onLoggedOut()
+        } catch (e: Exception) {
+            loadError = true
         }
     }
-
-    LaunchedEffect(year) { reload(year) }
 
     Box(Modifier.fillMaxSize().background(VelometrColors.background)) {
         BoxWithConstraints(modifier = Modifier.align(Alignment.TopCenter).widthIn(max = 900.dp).fillMaxWidth()) {
@@ -83,11 +90,17 @@ fun DashboardScreen(api: ApiClient, onLoggedOut: () -> Unit) {
                     onImportClick = { showImportModal = true },
                 )
                 Spacer(Modifier.height(24.dp))
-                summary?.let { HeroBlock(it, isNarrow) }
-                Spacer(Modifier.height(24.dp))
-                WeeklyChart(weeks)
-                Spacer(Modifier.height(30.dp))
-                TripList(activities, isNarrow)
+                if (loadError) {
+                    Text("Не удалось загрузить данные", color = VelometrColors.accent)
+                    TextButton(onClick = { refreshVersion++ }) { Text("Повторить") }
+                }
+                data?.let { loaded ->
+                    HeroBlock(loaded.summary, isNarrow)
+                    Spacer(Modifier.height(24.dp))
+                    WeeklyChart(loaded.weeks)
+                    Spacer(Modifier.height(30.dp))
+                    TripList(loaded.activities, isNarrow)
+                }
             }
         }
 
@@ -98,7 +111,7 @@ fun DashboardScreen(api: ApiClient, onLoggedOut: () -> Unit) {
                     try {
                         api.importZip(bytes, filename)
                         showImportModal = false
-                        scope.launch { reload(year) }
+                        refreshVersion++
                     } catch (e: UnauthorizedException) {
                         api.logout()
                         showImportModal = false
@@ -109,6 +122,12 @@ fun DashboardScreen(api: ApiClient, onLoggedOut: () -> Unit) {
         }
     }
 }
+
+private data class DashboardData(
+    val summary: YearSummaryDto,
+    val weeks: List<Double>,
+    val activities: List<ActivityDto>,
+)
 
 @Composable
 private fun DashboardHeader(year: Int, isNarrow: Boolean, onYearChange: (Int) -> Unit, onImportClick: () -> Unit) {

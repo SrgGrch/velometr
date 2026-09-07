@@ -35,6 +35,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.browser.document
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.launch
 import org.khronos.webgl.ArrayBuffer
 import org.khronos.webgl.Int8Array
@@ -205,7 +206,11 @@ fun ImportModal(onClose: () -> Unit, onImport: suspend (ByteArray, String) -> Un
                         try {
                             val bytes = file.readAllBytes()
                             onImport(bytes, file.name)
-                        } catch (t: Throwable) {
+                        } catch (e: CancellationException) {
+                            throw e
+                        } catch (e: ImportException) {
+                            error = e.message
+                        } catch (t: Exception) {
                             error = "Не удалось импортировать файл"
                         } finally {
                             submitting = false

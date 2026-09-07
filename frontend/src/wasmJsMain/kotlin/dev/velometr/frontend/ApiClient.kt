@@ -12,6 +12,7 @@ import io.ktor.client.request.header
 import io.ktor.client.request.parameter
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
+import io.ktor.client.statement.bodyAsText
 import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
@@ -25,6 +26,7 @@ import kotlinx.serialization.json.Json
 
 /** Thrown when the backend rejects the stored token (missing, invalid, or issued by a previous process). */
 class UnauthorizedException : RuntimeException()
+class ImportException(message: String) : RuntimeException(message)
 
 private const val TOKEN_STORAGE_KEY = "velometr_token"
 
@@ -103,6 +105,11 @@ class ApiClient {
                 )
             )
         }
+        if (response.status == HttpStatusCode.PayloadTooLarge) {
+            throw ImportException("Архив превышает лимит 500 МиБ")
+        }
+        if (response.status == HttpStatusCode.BadRequest) throw ImportException(response.bodyAsText())
+        if (response.status != HttpStatusCode.OK) throw ImportException("Не удалось импортировать файл")
         return response.body()
     }
 }

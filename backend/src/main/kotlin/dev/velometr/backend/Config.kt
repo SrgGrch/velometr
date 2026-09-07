@@ -4,7 +4,11 @@ data class AppConfig(
     val dataPath: String,
     val authPasscode: String,
     val port: Int,
-)
+) {
+    init {
+        require(authPasscode.isNotBlank()) { "AUTH_PASSCODE must not be blank" }
+    }
+}
 
 fun loadConfig(): AppConfig {
     val dataPath = System.getenv("DATA_PATH")

@@ -5,7 +5,7 @@ services:
       dockerfile: backend/Dockerfile
     environment:
       DATA_PATH: ${DATA_PATH}
-      AUTH_PASSCODE: ${AUTH_PASSCODE}
+      AUTH_PASSCODE: ${AUTH_PASSCODE:?AUTH_PASSCODE must not be empty}
     volumes:
       - ${DATA_VOLUME:-velometr-data}:/data
     restart: unless-stopped

@@ -17,32 +17,42 @@ class ActivityRepository(private val dataPath: String) {
      * overlapping archive never creates duplicates. Track bytes, when present,
      * are expected to already be gzip-compressed by the caller.
      */
-    fun importBatch(activities: List<Pair<ParsedActivity, ByteArray?>>): ImportStats {
+    fun importBatch(activities: List<Pair<ParsedActivity, ByteArray?>>): ImportStats =
+        importBatch(activities.asSequence())
+
+    fun importBatch(activities: Sequence<Pair<ParsedActivity, ByteArray?>>): ImportStats {
         var inserted = 0
+        var total = 0
         connection().use { conn ->
             conn.autoCommit = false
-            conn.prepareStatement(
-                """
-                INSERT OR IGNORE INTO activities
-                  (id, date, title, distance_km, duration_sec, avg_speed, max_speed, track_gpx)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-                """.trimIndent()
-            ).use { stmt ->
-                for ((activity, track) in activities) {
-                    stmt.setLong(1, activity.id)
-                    stmt.setString(2, activity.date)
-                    stmt.setString(3, activity.title)
-                    stmt.setDouble(4, activity.distanceKm)
-                    stmt.setLong(5, activity.durationSec)
-                    setNullableDouble(stmt, 6, activity.avgSpeedKmh)
-                    setNullableDouble(stmt, 7, activity.maxSpeedKmh)
-                    if (track != null) stmt.setBytes(8, track) else stmt.setNull(8, Types.BLOB)
-                    inserted += stmt.executeUpdate()
+            try {
+                conn.prepareStatement(
+                    """
+                    INSERT OR IGNORE INTO activities
+                      (id, date, title, distance_km, duration_sec, avg_speed, max_speed, track_gpx)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                    """.trimIndent()
+                ).use { stmt ->
+                    for ((activity, track) in activities) {
+                        total++
+                        stmt.setLong(1, activity.id)
+                        stmt.setString(2, activity.date)
+                        stmt.setString(3, activity.title)
+                        stmt.setDouble(4, activity.distanceKm)
+                        stmt.setLong(5, activity.durationSec)
+                        setNullableDouble(stmt, 6, activity.avgSpeedKmh)
+                        setNullableDouble(stmt, 7, activity.maxSpeedKmh)
+                        if (track != null) stmt.setBytes(8, track) else stmt.setNull(8, Types.BLOB)
+                        inserted += stmt.executeUpdate()
+                    }
                 }
+                conn.commit()
+            } catch (failure: Throwable) {
+                runCatching { conn.rollback() }.exceptionOrNull()?.let { failure.addSuppressed(it) }
+                throw failure
             }
-            conn.commit()
         }
-        return ImportStats(imported = inserted, skipped = activities.size - inserted, total = activities.size)
+        return ImportStats(imported = inserted, skipped = total - inserted, total = total)
     }
 
     private fun setNullableDouble(stmt: java.sql.PreparedStatement, index: Int, value: Double?) {

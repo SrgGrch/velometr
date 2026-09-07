@@ -12,6 +12,31 @@ import io.ktor.server.routing.get
 import io.ktor.server.routing.post
 import io.ktor.utils.io.jvm.javaio.copyTo
 import java.io.File
+import java.io.OutputStream
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+
+internal const val MAX_UPLOAD_BYTES = 500L * 1024 * 1024
+internal class UploadTooLargeException : RuntimeException()
+
+internal class LimitedUploadStream(private val delegate: OutputStream, private val limit: Long) : OutputStream() {
+    private var written = 0L
+    override fun write(value: Int) {
+        if (written >= limit) throw UploadTooLargeException()
+        delegate.write(value)
+        written++
+    }
+    override fun write(bytes: ByteArray, offset: Int, length: Int) {
+        if (length.toLong() > limit - written) throw UploadTooLargeException()
+        delegate.write(bytes, offset, length)
+        written += length
+    }
+}
+
+internal suspend fun <T> withUploadFile(block: suspend (File) -> T): T {
+    val file = File.createTempFile("velometr-import", ".zip")
+    return try { block(file) } finally { file.delete() }
+}
 
 fun Route.loginRoutes(config: AppConfig, jwtService: JwtService) {
     post("/api/login") {
@@ -24,27 +49,35 @@ fun Route.loginRoutes(config: AppConfig, jwtService: JwtService) {
     }
 }
 
-fun Route.importRoutes(importService: ImportService) {
+fun Route.importRoutes(importService: ImportService, uploadLimit: Long = MAX_UPLOAD_BYTES) {
     post("/api/import") {
-        var tempFile: File? = null
         try {
-            call.receiveMultipart().forEachPart { part ->
-                if (part is PartData.FileItem && tempFile == null) {
-                    val file = File.createTempFile("velometr-import", ".zip")
-                    file.outputStream().use { output -> part.provider().copyTo(output) }
-                    tempFile = file
+            withUploadFile { file ->
+                var uploaded = false
+                // Enforce our own byte limit so oversized uploads consistently return 413.
+                call.receiveMultipart(formFieldLimit = Long.MAX_VALUE).forEachPart { part ->
+                    try {
+                        if (part is PartData.FileItem && !uploaded) {
+                            file.outputStream().use { output ->
+                                part.provider().copyTo(LimitedUploadStream(output, uploadLimit))
+                            }
+                            uploaded = true
+                        }
+                    } finally {
+                        part.dispose()
+                    }
                 }
-                part.dispose()
+                if (!uploaded) {
+                    call.respond(HttpStatusCode.BadRequest, "No file uploaded")
+                } else {
+                    val result = withContext(Dispatchers.IO) { importService.importZip(file) }
+                    call.respond(result)
+                }
             }
-            val file = tempFile
-            if (file == null) {
-                call.respond(HttpStatusCode.BadRequest, "No file uploaded")
-                return@post
-            }
-            val result = importService.importZip(file)
-            call.respond(result)
-        } finally {
-            tempFile?.delete()
+        } catch (e: UploadTooLargeException) {
+            call.respond(HttpStatusCode.PayloadTooLarge, "Archive exceeds the 500 MiB upload limit")
+        } catch (e: InvalidArchiveException) {
+            call.respond(HttpStatusCode.BadRequest, e.message.orEmpty())
         }
     }
 }
