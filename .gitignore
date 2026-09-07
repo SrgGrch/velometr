@@ -9,3 +9,5 @@ kotlin-js-store/
 
 # Local env
 .env
+# Playwright CLI output (may contain credentials)
+.playwright-cli/

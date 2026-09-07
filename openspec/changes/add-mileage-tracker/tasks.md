@@ -24,7 +24,7 @@
 - [x] 4.4 For each imported activity, locate a matching track file (`.gpx`/`.fit.gz`) in the archive, gzip it, and store it in `track_gpx`, and verify a test confirms activities without a matching track file still import successfully with `track_gpx` left null
 - [x] 4.5 Confirm distance/duration/avg/max speed values are taken directly from the CSV row and never recomputed from track points, and verify via a test using an activity that has both a CSV row and a track file
 - [ ] 4.6 Build the import modal UI (dropzone drag/drop + file picker, selected-file row with remove action, import button enabled only when a file is selected) per the mockup, and verify manually that selecting, removing, and re-selecting a file toggles the import button correctly
-- [ ] 4.7 Wire the modal's confirm action to the import endpoint and verify manually that a successful import closes/updates the modal and the dashboard reflects the newly imported activities
+- [x] 4.7 Wire the modal's confirm action to the import endpoint and verify manually that a successful import closes/updates the modal and the dashboard reflects the newly imported activities
 
 ## 5. Aggregation and dashboard API
 
@@ -35,13 +35,13 @@
 
 ## 6. Dashboard frontend
 
-- [ ] 6.1 Build the dashboard header (app name, year switcher, import button) and wire the year switcher to refetch data for the selected year, and verify manually that switching years updates the displayed data
-- [ ] 6.2 Build the hero block (yearly total + three supporting stats) bound to the endpoint from 5.1, and verify manually it renders correctly for a year with data and a year without
-- [ ] 6.3 Build the 52-week horizontal-scroll bar chart with month labels and peak-week highlighting, bound to the endpoint from 5.2, and verify manually against the mockup's visual behavior
-- [ ] 6.4 Build the trip list as cards (title, date, distance, duration, avg speed, max speed; no click-through to a detail screen), bound to the endpoint from 5.3, and verify manually that no detail navigation is triggered on card interaction
+- [x] 6.1 Build the dashboard header (app name, year switcher, import button) and wire the year switcher to refetch data for the selected year, and verify manually that switching years updates the displayed data
+- [x] 6.2 Build the hero block (yearly total + three supporting stats) bound to the endpoint from 5.1, and verify manually it renders correctly for a year with data and a year without
+- [x] 6.3 Build the 52-week horizontal-scroll bar chart with month labels and peak-week highlighting, bound to the endpoint from 5.2, and verify manually against the mockup's visual behavior
+- [x] 6.4 Build the trip list as cards (title, date, distance, duration, avg speed, max speed; no click-through to a detail screen), bound to the endpoint from 5.3, and verify manually that no detail navigation is triggered on card interaction
 
 ## 7. Deployment
 
-- [ ] 7.1 Write Dockerfiles for `backend` and `frontend` and a `docker-compose.yml` wiring both services plus the nginx `/api/*` proxy to `backend`, and verify `docker compose up` serves the login screen at the frontend port
-- [ ] 7.2 Mount `DATA_PATH` as a volume in compose and verify that removing and recreating the `backend` container preserves previously imported activities
+- [x] 7.1 Write Dockerfiles for `backend` and `frontend` and a `docker-compose.yml` wiring both services plus the nginx `/api/*` proxy to `backend`, and verify `docker compose up` serves the login screen at the frontend port
+- [x] 7.2 Mount `DATA_PATH` as a volume in compose and verify that removing and recreating the `backend` container preserves previously imported activities
 - [ ] 7.3 Verify end-to-end: fresh `docker compose up`, log in with `AUTH_PASSCODE`, import a sample Strava export zip, and confirm the dashboard shows the imported activities' stats

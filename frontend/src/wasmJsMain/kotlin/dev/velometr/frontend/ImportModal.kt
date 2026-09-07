@@ -20,6 +20,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -38,6 +39,8 @@ import kotlinx.coroutines.launch
 import org.khronos.webgl.ArrayBuffer
 import org.khronos.webgl.Int8Array
 import org.khronos.webgl.toByteArray
+import org.w3c.dom.DragEvent
+import org.w3c.dom.HTMLCanvasElement
 import org.w3c.dom.HTMLInputElement
 import org.w3c.files.File
 import org.w3c.files.FileReader
@@ -52,7 +55,54 @@ fun ImportModal(onClose: () -> Unit, onImport: suspend (ByteArray, String) -> Un
     var selectedFile by remember { mutableStateOf<File?>(null) }
     var submitting by remember { mutableStateOf(false) }
     var error by remember { mutableStateOf<String?>(null) }
+    var isDragOver by remember { mutableStateOf(false) }
     val scope = rememberCoroutineScope()
+
+    // Compose for wasmJs renders onto a single <canvas>, so there's no per-composable
+    // DOM node to attach native drag events to via a Modifier. Instead we wire the
+    // HTML5 drag-and-drop events directly onto the canvas element for as long as this
+    // modal is in composition, and tear them down when it closes.
+    DisposableEffect(Unit) {
+        val canvas = document.getElementById("ComposeTarget") as? HTMLCanvasElement
+
+        val onDragEnter: (DragEvent) -> Unit = { event ->
+            event.preventDefault()
+            isDragOver = true
+        }
+        val onDragOver: (DragEvent) -> Unit = { event ->
+            event.preventDefault()
+            isDragOver = true
+        }
+        val onDragLeave: (DragEvent) -> Unit = { event ->
+            event.preventDefault()
+            isDragOver = false
+        }
+        val onDrop: (DragEvent) -> Unit = { event ->
+            event.preventDefault()
+            isDragOver = false
+            val file = event.dataTransfer?.files?.item(0)
+            if (file == null) {
+                // no-op: browsers can fire drop with an empty file list for non-file drags
+            } else if (isZipFile(file)) {
+                selectedFile = file
+                error = null
+            } else {
+                error = "Нужен .zip архив"
+            }
+        }
+
+        canvas?.ondragenter = onDragEnter
+        canvas?.ondragover = onDragOver
+        canvas?.ondragleave = onDragLeave
+        canvas?.ondrop = onDrop
+
+        onDispose {
+            canvas?.ondragenter = null
+            canvas?.ondragover = null
+            canvas?.ondragleave = null
+            canvas?.ondrop = null
+        }
+    }
 
     Box(
         modifier = Modifier.fillMaxSize().background(Color(0xB8080A09)),
@@ -87,7 +137,15 @@ fun ImportModal(onClose: () -> Unit, onImport: suspend (ByteArray, String) -> Un
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .border(1.5.dp, VelometrColors.line, RoundedCornerShape(10.dp))
+                        .background(
+                            if (isDragOver) VelometrColors.accent.copy(alpha = 0.08f) else Color.Transparent,
+                            RoundedCornerShape(10.dp),
+                        )
+                        .border(
+                            1.5.dp,
+                            if (isDragOver) VelometrColors.accent else VelometrColors.line,
+                            RoundedCornerShape(10.dp),
+                        )
                         .clickable {
                             pickZipFile { file -> selectedFile = file; error = null }
                         }
@@ -163,6 +221,11 @@ fun ImportModal(onClose: () -> Unit, onImport: suspend (ByteArray, String) -> Un
         }
     }
 }
+
+private fun isZipFile(file: File): Boolean =
+    file.name.endsWith(".zip", ignoreCase = true) ||
+        file.type == "application/zip" ||
+        file.type == "application/x-zip-compressed"
 
 private fun pickZipFile(onPicked: (File) -> Unit) {
     val input = document.createElement("input") as HTMLInputElement

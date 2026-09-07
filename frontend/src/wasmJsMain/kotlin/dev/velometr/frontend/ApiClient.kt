@@ -3,6 +3,7 @@ package dev.velometr.frontend
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
+import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.request.forms.MultiPartFormDataContent
 import io.ktor.client.request.forms.formData
 import io.ktor.client.request.get
@@ -13,8 +14,10 @@ import io.ktor.http.ContentType
 import io.ktor.http.HttpHeaders
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.Headers
+import io.ktor.http.URLProtocol
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
+import kotlinx.browser.window
 import kotlinx.serialization.json.Json
 
 /**
@@ -25,6 +28,16 @@ class ApiClient {
     private val client = HttpClient {
         install(ContentNegotiation) {
             json(Json { ignoreUnknownKeys = true })
+        }
+        // Ktor resolves scheme-less request URLs (e.g. "/api/login") against
+        // http://localhost by default, not the page's actual origin (KTOR-2363)
+        // - fatal when the app is opened via a LAN IP rather than localhost.
+        defaultRequest {
+            url {
+                protocol = if (window.location.protocol == "https:") URLProtocol.HTTPS else URLProtocol.HTTP
+                host = window.location.hostname
+                window.location.port.toIntOrNull()?.let { port = it }
+            }
         }
     }
 
