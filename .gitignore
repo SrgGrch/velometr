@@ -1,1 +1,21 @@
 _docs/*
+
+# Gradle / Kotlin build artifacts and caches
+.gradle/
+.kotlin/
+build/
+kotlin-js-store/
+*.log
+
+# Local env
+.env
+# Playwright CLI output (may contain credentials)
+.playwright-cli/
+.playwright/
+
+# Local tooling artifacts, not part of the project
+node_modules/
+package.json
+package-lock.json
+.agents/skills/complex-review/
+.claude/skills/playwright-cli/

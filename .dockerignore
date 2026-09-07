@@ -1,0 +1,15 @@
+# Host build state must not overwrite the builder's persistent caches.
+**/build
+**/.gradle
+**/.kotlin
+**/node_modules
+kotlin-js-store
+.git
+.env
+.env.*
+.local
+.playwright
+.playwright-cli
+.agents
+.claude
+_docs

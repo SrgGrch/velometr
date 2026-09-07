@@ -1,0 +1,26 @@
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: backend/Dockerfile
+    environment:
+      DATA_PATH: ${DATA_PATH}
+      AUTH_PASSCODE: ${AUTH_PASSCODE:?AUTH_PASSCODE must not be empty}
+    volumes:
+      - ${DATA_VOLUME:-velometr-data}:/data
+    restart: unless-stopped
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        FRONTEND_BUILD_MODE: ${FRONTEND_BUILD_MODE:-production}
+    ports:
+      - "${FRONTEND_PORT:-8080}:80"
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+volumes:
+  velometr-data:
