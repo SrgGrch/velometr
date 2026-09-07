@@ -2,6 +2,7 @@ package dev.velometr.frontend.presentation
 
 import kotlin.math.roundToLong
 import kotlin.time.Clock
+import kotlinx.datetime.LocalDate
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.todayIn
 
@@ -39,6 +40,12 @@ fun formatDuration(seconds: Long): String {
 }
 
 fun formatSpeed(kmh: Double?): String = if (kmh == null) "-" else formatOneDecimal(kmh)
+
+/** Which of the dashboard's 52 fixed 7-day week-buckets (0-based) a date falls into - mirrors the backend's ActivityRepository.weeklyDistances bucketing, so trip-list grouping lines up with the weekly chart. */
+fun weekIndexOf(isoDateTime: String): Int {
+    val dayOfYear = LocalDate.parse(isoDateTime.substringBefore('T')).dayOfYear
+    return minOf(51, (dayOfYear - 1) / 7)
+}
 
 /** ISO local date-time -> "d mmm" (e.g. "5 сен") */
 fun formatShortDate(isoDateTime: String): String {

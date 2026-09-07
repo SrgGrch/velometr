@@ -278,27 +278,42 @@ private fun TripList(activities: List<ActivityDto>, isNarrow: Boolean) {
         Spacer(Modifier.height(14.dp))
         val maxDistance = activities.maxOfOrNull { it.distanceKm } ?: 0.0
         val columns = if (isNarrow) 1 else 2
-        activities.chunked(columns).forEach { row ->
-            Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                row.forEach { activity ->
-                    TripCard(
-                        activity = activity,
-                        isPeak = activity.distanceKm > maxDistance * 0.8,
-                        modifier = Modifier.weight(1f),
-                    )
+        // activities arrives sorted newest-first, so groupBy's insertion-ordered keys keep weeks newest-first too.
+        val weekGroups = activities.groupBy { weekIndexOf(it.date) }
+        weekGroups.entries.forEachIndexed { index, (weekIndex, weekActivities) ->
+            if (index != 0) Spacer(Modifier.height(20.dp))
+            Text(
+                "Неделя ${weekIndex + 1}",
+                color = VelometrColors.textFaint,
+                fontFamily = FontFamily.Monospace,
+                fontSize = 12.sp,
+            )
+            Spacer(Modifier.height(10.dp))
+            weekActivities.chunked(columns).forEach { row ->
+                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    row.forEach { activity ->
+                        TripCard(
+                            activity = activity,
+                            isPeak = activity.distanceKm > maxDistance * 0.8,
+                            modifier = Modifier.weight(1f),
+                        )
+                    }
+                    if (columns == 2 && row.size == 1) Spacer(Modifier.weight(1f))
                 }
-                if (columns == 2 && row.size == 1) Spacer(Modifier.weight(1f))
+                Spacer(Modifier.height(12.dp))
             }
-            Spacer(Modifier.height(12.dp))
         }
     }
 }
 
 @Composable
 private fun TripCard(activity: ActivityDto, isPeak: Boolean, modifier: Modifier = Modifier) {
-    SelectionContainer {
+    // The caller's modifier (e.g. RowScope.weight) must land on SelectionContainer itself -
+    // it's the direct child of the enclosing Row, whereas the inner Row here is not, so weight
+    // applied there is silently dropped and starves the second card in a two-up row.
+    SelectionContainer(modifier = modifier) {
         Row(
-            modifier = modifier
+            modifier = Modifier
                 .background(VelometrColors.panel, RoundedCornerShape(10.dp))
                 .padding(vertical = 16.dp, horizontal = 18.dp),
         ) {
