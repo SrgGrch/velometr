@@ -47,7 +47,6 @@ import org.khronos.webgl.ArrayBuffer
 import org.khronos.webgl.Int8Array
 import org.khronos.webgl.toByteArray
 import org.w3c.dom.DragEvent
-import org.w3c.dom.HTMLCanvasElement
 import org.w3c.dom.HTMLInputElement
 import org.w3c.files.File
 import org.w3c.files.FileReader
@@ -66,12 +65,12 @@ fun ImportModal(onClose: () -> Unit, onImport: suspend (ByteArray, String) -> Un
     val scope = rememberCoroutineScope()
 
     // Compose for wasmJs renders onto a single <canvas>, so there's no per-composable
-    // DOM node to attach native drag events to via a Modifier. Instead we wire the
-    // HTML5 drag-and-drop events directly onto the canvas element for as long as this
-    // modal is in composition, and tear them down when it closes.
+    // DOM node to attach native drag events to via a Modifier. The canvas also lives
+    // inside a shadow root ComposeViewport creates with no predictable id, so instead
+    // of hunting for it we listen on `document` - drag events bubble (and cross shadow
+    // boundaries, being composed) up to it just the same - for as long as this modal is
+    // in composition, and tear the listeners down when it closes.
     DisposableEffect(Unit) {
-        val canvas = document.getElementById("ComposeTarget") as? HTMLCanvasElement
-
         val onDragEnter: (DragEvent) -> Unit = { event ->
             event.preventDefault()
             isDragOver = true
@@ -98,16 +97,16 @@ fun ImportModal(onClose: () -> Unit, onImport: suspend (ByteArray, String) -> Un
             }
         }
 
-        canvas?.ondragenter = onDragEnter
-        canvas?.ondragover = onDragOver
-        canvas?.ondragleave = onDragLeave
-        canvas?.ondrop = onDrop
+        document.ondragenter = onDragEnter
+        document.ondragover = onDragOver
+        document.ondragleave = onDragLeave
+        document.ondrop = onDrop
 
         onDispose {
-            canvas?.ondragenter = null
-            canvas?.ondragover = null
-            canvas?.ondragleave = null
-            canvas?.ondrop = null
+            document.ondragenter = null
+            document.ondragover = null
+            document.ondragleave = null
+            document.ondrop = null
         }
     }
 
