@@ -14,7 +14,7 @@
 
 - [x] 3.1 Implement a login endpoint that compares a submitted passcode to `AUTH_PASSCODE` server-side and returns a session token/cookie on success, and verify a test covers both correct and incorrect passcode cases
 - [x] 3.2 Add backend middleware that rejects unauthenticated requests to all non-login API routes, and verify a test confirms a request without a valid session is denied
-- [ ] 3.3 Build the login screen (single passcode field, submit button, contour-line background per mockup) and verify manually that submitting the correct passcode grants access and an incorrect one shows an error without granting access
+- [x] 3.3 Build the login screen (single passcode field, submit button, contour-line background per mockup) and verify manually that submitting the correct passcode grants access and an incorrect one shows an error without granting access
 
 ## 4. Activity import
 
@@ -23,7 +23,7 @@
 - [x] 4.3 Wire parsed rows through the upsert-by-id repository function from 2.3 and verify an integration test shows importing the same archive twice produces no duplicate rows
 - [x] 4.4 For each imported activity, locate a matching track file (`.gpx`/`.fit.gz`) in the archive, gzip it, and store it in `track_gpx`, and verify a test confirms activities without a matching track file still import successfully with `track_gpx` left null
 - [x] 4.5 Confirm distance/duration/avg/max speed values are taken directly from the CSV row and never recomputed from track points, and verify via a test using an activity that has both a CSV row and a track file
-- [ ] 4.6 Build the import modal UI (dropzone drag/drop + file picker, selected-file row with remove action, import button enabled only when a file is selected) per the mockup, and verify manually that selecting, removing, and re-selecting a file toggles the import button correctly
+- [x] 4.6 Build the import modal UI (dropzone drag/drop + file picker, selected-file row with remove action, import button enabled only when a file is selected) per the mockup, and verify manually that selecting, removing, and re-selecting a file toggles the import button correctly
 - [x] 4.7 Wire the modal's confirm action to the import endpoint and verify manually that a successful import closes/updates the modal and the dashboard reflects the newly imported activities
 
 ## 5. Aggregation and dashboard API
@@ -44,4 +44,4 @@
 
 - [x] 7.1 Write Dockerfiles for `backend` and `frontend` and a `docker-compose.yml` wiring both services plus the nginx `/api/*` proxy to `backend`, and verify `docker compose up` serves the login screen at the frontend port
 - [x] 7.2 Mount `DATA_PATH` as a volume in compose and verify that removing and recreating the `backend` container preserves previously imported activities
-- [ ] 7.3 Verify end-to-end: fresh `docker compose up`, log in with `AUTH_PASSCODE`, import a sample Strava export zip, and confirm the dashboard shows the imported activities' stats
+- [x] 7.3 Verify end-to-end: fresh `docker compose up`, log in with `AUTH_PASSCODE`, import a sample Strava export zip, and confirm the dashboard shows the imported activities' stats
