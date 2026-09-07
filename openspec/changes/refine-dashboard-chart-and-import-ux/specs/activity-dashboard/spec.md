@@ -1,15 +1,26 @@
 ## MODIFIED Requirements
 
+### Requirement: Yearly hero stats
+The system SHALL display, for the selected year, the total distance, the number of trips, the average weekly distance, and the longest single trip's distance. The average weekly distance SHALL equal the selected year's total distance divided by the number of distinct calendar weeks that contain at least one trip, excluding weeks without trips from the divisor.
+
+#### Scenario: Year has activities
+- **WHEN** the selected year has one or more imported activities across one or more calendar weeks
+- **THEN** the hero block shows the total distance, trip count, longest trip, and average weekly distance calculated using only the distinct weeks that contain at least one trip
+
+#### Scenario: Multiple trips occur in one active week
+- **WHEN** the selected year contains multiple trips in the same calendar week
+- **THEN** that calendar week contributes once to the average weekly distance divisor
+
+#### Scenario: Year has no activities
+- **WHEN** the selected year has no imported activities
+- **THEN** the hero block shows zero/empty values without error and the average weekly distance is zero
+
 ### Requirement: Weekly distance chart
-The system SHALL display a 52-week bar chart of distance per week for the selected year, scrollable horizontally when its content does not fit, with month labels and bars spanning the available plotting width from its leading edge to its trailing edge. Weekly bars SHALL use the accent color only while hovered or selected by click, and SHALL otherwise use the default chart color regardless of distance.
+The system SHALL display a 52-week bar chart of distance per week for the selected year, with month labels and bars always filling the available plotting width from its leading edge to its trailing edge without horizontal scrolling. Weekly bars SHALL use the accent color only while hovered or selected by click, and SHALL otherwise use the default chart color regardless of distance.
 
-#### Scenario: Chart has available horizontal space
-- **WHEN** the weekly chart is displayed in a viewport wide enough for its content
-- **THEN** the weekly bars are distributed across the full plotting width with the first and last bars aligned to its edges
-
-#### Scenario: Chart content exceeds the viewport
-- **WHEN** the weekly chart cannot fit its content at its minimum usable bar width
-- **THEN** the chart remains horizontally scrollable together with its month labels
+#### Scenario: Chart is displayed at any supported viewport width
+- **WHEN** the weekly chart is displayed
+- **THEN** its bars and month labels fill the current plotting width without horizontal scrolling, with the first and last bars aligned to its edges
 
 #### Scenario: No week is active
 - **WHEN** no weekly bar is hovered or selected
