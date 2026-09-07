@@ -7,7 +7,7 @@ services:
       DATA_PATH: ${DATA_PATH}
       AUTH_PASSCODE: ${AUTH_PASSCODE}
     volumes:
-      - velometr-data:/root/velo-data
+      - ${DATA_VOLUME:-velometr-data}:/data
     restart: unless-stopped
 
   frontend:
