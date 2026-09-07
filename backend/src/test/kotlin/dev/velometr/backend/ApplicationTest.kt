@@ -1,9 +1,9 @@
 package dev.velometr.backend
 
-import io.ktor.client.plugins.cookies.HttpCookies
 import io.ktor.client.request.forms.formData
 import io.ktor.client.request.forms.submitFormWithBinaryData
 import io.ktor.client.request.get
+import io.ktor.client.request.header
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
 import io.ktor.client.statement.bodyAsText
@@ -82,28 +82,28 @@ class ApplicationTest {
             )
         )
         application { module(config(dbPath)) }
-        val cookieClient = createClient { install(HttpCookies) }
 
-        val login = cookieClient.post("/api/login") {
+        val login = client.post("/api/login") {
             contentType(ContentType.Application.Json)
             setBody("""{"passcode":"secret123"}""")
         }
         assertEquals(HttpStatusCode.OK, login.status)
+        val token = Json.decodeFromString<LoginResponse>(login.bodyAsText()).token
 
-        val summary = cookieClient.get("/api/stats/2026/summary")
+        val summary = client.get("/api/stats/2026/summary") { header(HttpHeaders.Authorization, "Bearer $token") }
         assertEquals(HttpStatusCode.OK, summary.status)
         val summaryDto = Json.decodeFromString<YearSummaryDto>(summary.bodyAsText())
         assertEquals(2, summaryDto.tripCount)
         assertEquals(50.0, summaryDto.totalDistanceKm, 1e-9)
         assertEquals(40.0, summaryDto.longestTripKm, 1e-9)
 
-        val weekly = cookieClient.get("/api/stats/2026/weekly")
+        val weekly = client.get("/api/stats/2026/weekly") { header(HttpHeaders.Authorization, "Bearer $token") }
         assertEquals(HttpStatusCode.OK, weekly.status)
         val weeklyDto = Json.decodeFromString<WeeklyDistanceDto>(weekly.bodyAsText())
         assertEquals(52, weeklyDto.weeks.size)
         assertEquals(50.0, weeklyDto.weeks.sum(), 1e-9)
 
-        val list = cookieClient.get("/api/activities?year=2026")
+        val list = client.get("/api/activities?year=2026") { header(HttpHeaders.Authorization, "Bearer $token") }
         assertEquals(HttpStatusCode.OK, list.status)
         val listBody = list.bodyAsText()
         val activities = Json.decodeFromString<List<ActivityDto>>(listBody)
@@ -116,11 +116,11 @@ class ApplicationTest {
         val dbPath = tempDbPath()
         Database.migrate(dbPath)
         application { module(config(dbPath)) }
-        val cookieClient = createClient { install(HttpCookies) }
-        cookieClient.post("/api/login") {
+        val login = client.post("/api/login") {
             contentType(ContentType.Application.Json)
             setBody("""{"passcode":"secret123"}""")
         }
+        val token = Json.decodeFromString<LoginResponse>(login.bodyAsText()).token
 
         val csv = buildString {
             appendLine("Activity ID,Activity Date,Activity Name,Distance,Moving Time,Max Speed,Average Speed,Filename")
@@ -134,7 +134,7 @@ class ApplicationTest {
             }
         }.toByteArray()
 
-        val response = cookieClient.submitFormWithBinaryData(
+        val response = client.submitFormWithBinaryData(
             url = "/api/import",
             formData = formData {
                 append("file", zipBytes, Headers.build {
@@ -142,7 +142,7 @@ class ApplicationTest {
                     append(HttpHeaders.ContentDisposition, "filename=\"export.zip\"")
                 })
             }
-        )
+        ) { header(HttpHeaders.Authorization, "Bearer $token") }
         assertEquals(HttpStatusCode.OK, response.status)
         val stats = Json.decodeFromString<ImportStats>(response.bodyAsText())
         assertEquals(1, stats.imported)

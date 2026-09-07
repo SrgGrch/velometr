@@ -10,6 +10,8 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -100,7 +102,7 @@ fun LoginScreen(api: ApiClient, onSuccess: () -> Unit) {
         contentAlignment = Alignment.Center,
     ) {
         ContourFieldBackground(modifier = Modifier.fillMaxSize())
-        Column(modifier = Modifier.width(340.dp).padding(24.dp)) {
+        Column(modifier = Modifier.widthIn(max = 340.dp).fillMaxWidth().padding(24.dp)) {
             Text(
                 text = "Пробег",
                 color = VelometrColors.text,
@@ -124,6 +126,7 @@ fun LoginScreen(api: ApiClient, onSuccess: () -> Unit) {
                 singleLine = true,
                 visualTransformation = PasswordVisualTransformation(),
                 keyboardOptions = KeyboardOptions(imeAction = ImeAction.Done),
+                keyboardActions = KeyboardActions(onDone = { submit() }),
                 colors = OutlinedTextFieldDefaults.colors(
                     focusedTextColor = VelometrColors.text,
                     unfocusedTextColor = VelometrColors.text,

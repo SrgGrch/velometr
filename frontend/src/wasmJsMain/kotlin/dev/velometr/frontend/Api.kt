@@ -6,6 +6,9 @@ import kotlinx.serialization.Serializable
 data class LoginRequest(val passcode: String)
 
 @Serializable
+data class LoginResponse(val token: String)
+
+@Serializable
 data class ActivityDto(
     val id: Long,
     val date: String,

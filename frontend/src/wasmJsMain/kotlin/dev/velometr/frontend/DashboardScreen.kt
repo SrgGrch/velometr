@@ -1,9 +1,14 @@
 package dev.velometr.frontend
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.hoverable
+import androidx.compose.foundation.interaction.MutableInteractionSource
+import androidx.compose.foundation.interaction.collectIsHoveredAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -37,8 +42,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
 
+/** Below this content width the layout switches to the mockup's mobile arrangement (single-column trip grid, stacked header). */
+private val NARROW_BREAKPOINT = 620.dp
+
 @Composable
-fun DashboardScreen(api: ApiClient) {
+fun DashboardScreen(api: ApiClient, onLoggedOut: () -> Unit) {
     var year by remember { mutableStateOf(currentYear()) }
     var summary by remember { mutableStateOf<YearSummaryDto?>(null) }
     var weeks by remember { mutableStateOf<List<Double>>(emptyList()) }
@@ -47,42 +55,55 @@ fun DashboardScreen(api: ApiClient) {
     val scope = rememberCoroutineScope()
 
     suspend fun reload(y: Int) {
-        summary = api.yearSummary(y)
-        weeks = api.weeklyDistances(y).weeks
-        activities = api.activities(y)
+        try {
+            summary = api.yearSummary(y)
+            weeks = api.weeklyDistances(y).weeks
+            activities = api.activities(y)
+        } catch (e: UnauthorizedException) {
+            api.logout()
+            onLoggedOut()
+        }
     }
 
     LaunchedEffect(year) { reload(year) }
 
     Box(Modifier.fillMaxSize().background(VelometrColors.background)) {
-        Column(
-            modifier = Modifier
-                .align(Alignment.TopCenter)
-                .widthIn(max = 900.dp)
-                .fillMaxWidth()
-                .verticalScroll(rememberScrollState())
-                .padding(24.dp),
-        ) {
-            DashboardHeader(
-                year = year,
-                onYearChange = { year = it },
-                onImportClick = { showImportModal = true },
-            )
-            Spacer(Modifier.height(24.dp))
-            summary?.let { HeroBlock(it) }
-            Spacer(Modifier.height(24.dp))
-            WeeklyChart(weeks)
-            Spacer(Modifier.height(30.dp))
-            TripList(activities)
+        BoxWithConstraints(modifier = Modifier.align(Alignment.TopCenter).widthIn(max = 900.dp).fillMaxWidth()) {
+            val isNarrow = maxWidth < NARROW_BREAKPOINT
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .verticalScroll(rememberScrollState())
+                    .padding(if (isNarrow) 16.dp else 24.dp),
+            ) {
+                DashboardHeader(
+                    year = year,
+                    isNarrow = isNarrow,
+                    onYearChange = { year = it },
+                    onImportClick = { showImportModal = true },
+                )
+                Spacer(Modifier.height(24.dp))
+                summary?.let { HeroBlock(it, isNarrow) }
+                Spacer(Modifier.height(24.dp))
+                WeeklyChart(weeks)
+                Spacer(Modifier.height(30.dp))
+                TripList(activities, isNarrow)
+            }
         }
 
         if (showImportModal) {
             ImportModal(
                 onClose = { showImportModal = false },
                 onImport = { bytes, filename ->
-                    api.importZip(bytes, filename)
-                    showImportModal = false
-                    scope.launch { reload(year) }
+                    try {
+                        api.importZip(bytes, filename)
+                        showImportModal = false
+                        scope.launch { reload(year) }
+                    } catch (e: UnauthorizedException) {
+                        api.logout()
+                        showImportModal = false
+                        onLoggedOut()
+                    }
                 },
             )
         }
@@ -90,13 +111,8 @@ fun DashboardScreen(api: ApiClient) {
 }
 
 @Composable
-private fun DashboardHeader(year: Int, onYearChange: (Int) -> Unit, onImportClick: () -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text("Пробег", color = VelometrColors.text, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+private fun DashboardHeader(year: Int, isNarrow: Boolean, onYearChange: (Int) -> Unit, onImportClick: () -> Unit) {
+    val yearControls: @Composable () -> Unit = {
         Row(verticalAlignment = Alignment.CenterVertically) {
             TextButton(onClick = { onYearChange(year - 1) }) {
                 Text("‹", color = VelometrColors.textFaint, fontSize = 16.sp)
@@ -105,19 +121,54 @@ private fun DashboardHeader(year: Int, onYearChange: (Int) -> Unit, onImportClic
             TextButton(onClick = { onYearChange(year + 1) }) {
                 Text("›", color = VelometrColors.textFaint, fontSize = 16.sp)
             }
-            Spacer(Modifier.width(18.dp))
-            OutlinedButton(
-                onClick = onImportClick,
-                colors = ButtonDefaults.outlinedButtonColors(contentColor = VelometrColors.text),
+            if (year != currentYear()) {
+                Spacer(Modifier.width(6.dp))
+                TextButton(onClick = { onYearChange(currentYear()) }) {
+                    Text("Текущий год", color = VelometrColors.textMuted, fontSize = 12.sp)
+                }
+            }
+        }
+    }
+    val importButton: @Composable () -> Unit = {
+        OutlinedButton(
+            onClick = onImportClick,
+            colors = ButtonDefaults.outlinedButtonColors(contentColor = VelometrColors.text),
+        ) {
+            Text("Импорт данных", fontSize = 13.sp)
+        }
+    }
+
+    if (isNarrow) {
+        Column {
+            Text("Пробег", color = VelometrColors.text, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+            Spacer(Modifier.height(14.dp))
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
             ) {
-                Text("Импорт данных", fontSize = 13.sp)
+                yearControls()
+                importButton()
+            }
+        }
+    } else {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("Пробег", color = VelometrColors.text, fontWeight = FontWeight.SemiBold, fontSize = 15.sp)
+            Row(verticalAlignment = Alignment.CenterVertically) {
+                yearControls()
+                Spacer(Modifier.width(18.dp))
+                importButton()
             }
         }
     }
 }
 
 @Composable
-private fun HeroBlock(summary: YearSummaryDto) {
+private fun HeroBlock(summary: YearSummaryDto, isNarrow: Boolean) {
     Column(Modifier.fillMaxWidth()) {
         Text("Пробег за год", color = VelometrColors.textMuted, fontSize = 13.sp)
         Spacer(Modifier.height(10.dp))
@@ -125,7 +176,7 @@ private fun HeroBlock(summary: YearSummaryDto) {
             Text(
                 text = formatOneDecimal(summary.totalDistanceKm),
                 color = VelometrColors.text,
-                fontSize = 56.sp,
+                fontSize = if (isNarrow) 42.sp else 56.sp,
                 fontWeight = FontWeight.SemiBold,
                 fontFamily = FontFamily.Monospace,
             )
@@ -133,10 +184,20 @@ private fun HeroBlock(summary: YearSummaryDto) {
             Text("км", color = VelometrColors.textMuted, fontSize = 22.sp)
         }
         Spacer(Modifier.height(20.dp))
-        Row(horizontalArrangement = Arrangement.spacedBy(34.dp)) {
-            HeroStat(summary.tripCount.toString(), "поездок")
-            HeroStat(formatOneDecimal(summary.avgWeeklyDistanceKm), "км в среднем за неделю")
-            HeroStat(formatOneDecimal(summary.longestTripKm), "км, самая длинная поездка")
+        if (isNarrow) {
+            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                Row(horizontalArrangement = Arrangement.spacedBy(34.dp)) {
+                    HeroStat(summary.tripCount.toString(), "поездок")
+                    HeroStat(formatOneDecimal(summary.avgWeeklyDistanceKm), "км в среднем за неделю")
+                }
+                HeroStat(formatOneDecimal(summary.longestTripKm), "км, самая длинная поездка")
+            }
+        } else {
+            Row(horizontalArrangement = Arrangement.spacedBy(34.dp)) {
+                HeroStat(summary.tripCount.toString(), "поездок")
+                HeroStat(formatOneDecimal(summary.avgWeeklyDistanceKm), "км в среднем за неделю")
+                HeroStat(formatOneDecimal(summary.longestTripKm), "км, самая длинная поездка")
+            }
         }
         Spacer(Modifier.height(26.dp))
         HorizontalDivider(color = VelometrColors.line)
@@ -160,6 +221,9 @@ private val MONTH_LABELS = listOf(
 private fun WeeklyChart(weeks: List<Double>) {
     val max = (weeks.maxOrNull() ?: 0.0).coerceAtLeast(0.001)
     val scrollState = rememberScrollState()
+    var selectedWeek by remember(weeks) { mutableStateOf<Int?>(null) }
+    var hoveredWeek by remember(weeks) { mutableStateOf<Int?>(null) }
+    val activeWeek = hoveredWeek ?: selectedWeek
 
     Column(
         Modifier
@@ -167,24 +231,53 @@ private fun WeeklyChart(weeks: List<Double>) {
             .background(VelometrColors.panel, RoundedCornerShape(12.dp))
             .padding(22.dp),
     ) {
-        Text("Пробег по неделям", color = VelometrColors.textMuted, fontSize = 14.sp)
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically,
+        ) {
+            Text("Пробег по неделям", color = VelometrColors.textMuted, fontSize = 14.sp)
+            Text(
+                text = activeWeek?.let { "Неделя ${it + 1} · ${formatOneDecimal(weeks[it])} км" }.orEmpty(),
+                color = VelometrColors.text,
+                fontFamily = FontFamily.Monospace,
+                fontSize = 13.sp,
+            )
+        }
         Spacer(Modifier.height(18.dp))
         Row(
             modifier = Modifier.horizontalScroll(scrollState).height(120.dp).fillMaxWidth(),
             verticalAlignment = Alignment.Bottom,
             horizontalArrangement = Arrangement.spacedBy(3.dp),
         ) {
-            weeks.forEach { value ->
+            weeks.forEachIndexed { index, value ->
                 val heightFraction = (value / max).coerceIn(0.03, 1.0).toFloat()
+                val interactionSource = remember { MutableInteractionSource() }
+                val isHovered by interactionSource.collectIsHoveredAsState()
+                LaunchedEffect(isHovered) {
+                    if (isHovered) hoveredWeek = index else if (hoveredWeek == index) hoveredWeek = null
+                }
+                val isActive = index == activeWeek
                 Box(
                     modifier = Modifier
                         .width(10.dp)
-                        .fillMaxHeight(heightFraction)
-                        .background(
-                            color = if (value > max * 0.86) VelometrColors.accent else VelometrColors.contour,
-                            shape = RoundedCornerShape(topStart = 2.dp, topEnd = 2.dp),
-                        ),
-                )
+                        .fillMaxHeight()
+                        .hoverable(interactionSource)
+                        .clickable(interactionSource = interactionSource, indication = null) {
+                            selectedWeek = if (selectedWeek == index) null else index
+                        },
+                    contentAlignment = Alignment.BottomCenter,
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .fillMaxHeight(heightFraction)
+                            .background(
+                                color = if (isActive || value > max * 0.86) VelometrColors.accent else VelometrColors.contour,
+                                shape = RoundedCornerShape(topStart = 2.dp, topEnd = 2.dp),
+                            ),
+                    )
+                }
             }
         }
         Spacer(Modifier.height(8.dp))
@@ -197,12 +290,13 @@ private fun WeeklyChart(weeks: List<Double>) {
 }
 
 @Composable
-private fun TripList(activities: List<ActivityDto>) {
+private fun TripList(activities: List<ActivityDto>, isNarrow: Boolean) {
     Column(Modifier.fillMaxWidth()) {
         Text("Последние поездки", color = VelometrColors.textMuted, fontSize = 14.sp)
         Spacer(Modifier.height(14.dp))
         val maxDistance = activities.maxOfOrNull { it.distanceKm } ?: 0.0
-        activities.chunked(2).forEach { row ->
+        val columns = if (isNarrow) 1 else 2
+        activities.chunked(columns).forEach { row ->
             Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 row.forEach { activity ->
                     TripCard(
@@ -211,7 +305,7 @@ private fun TripList(activities: List<ActivityDto>) {
                         modifier = Modifier.weight(1f),
                     )
                 }
-                if (row.size == 1) Spacer(Modifier.weight(1f))
+                if (columns == 2 && row.size == 1) Spacer(Modifier.weight(1f))
             }
             Spacer(Modifier.height(12.dp))
         }

@@ -5,18 +5,15 @@ import io.ktor.server.application.Application
 import io.ktor.server.application.install
 import io.ktor.server.auth.Authentication
 import io.ktor.server.auth.authenticate
-import io.ktor.server.auth.session
+import io.ktor.server.auth.jwt.JWTPrincipal
+import io.ktor.server.auth.jwt.jwt
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.server.response.respond
 import io.ktor.server.routing.get
 import io.ktor.server.routing.routing
-import io.ktor.server.sessions.SessionTransportTransformerMessageAuthentication
-import io.ktor.server.sessions.Sessions
-import io.ktor.server.sessions.cookie
 import java.security.SecureRandom
-import javax.crypto.spec.SecretKeySpec
 
 fun main() {
     val config = loadConfig()
@@ -31,36 +28,32 @@ fun Application.module(config: AppConfig) {
     val importService = ImportService(repository)
 
     // A fresh key each process start is fine here: this is a single-user app
-    // with no requirement to survive restarts already logged in.
-    val sessionSecret = ByteArray(32).also { SecureRandom().nextBytes(it) }
-    val sessionAuthKey = SecretKeySpec(sessionSecret, "HmacSHA256")
+    // with no requirement for tokens to survive a backend restart.
+    val jwtSecret = ByteArray(32).also { SecureRandom().nextBytes(it) }
+    val jwtService = JwtService(jwtSecret)
 
     install(ContentNegotiation) {
         json()
     }
 
-    install(Sessions) {
-        cookie<UserSession>("VELOMETR_SESSION") {
-            cookie.httpOnly = true
-            cookie.path = "/"
-            cookie.maxAgeInSeconds = 60L * 60 * 24 * 30
-            transform(SessionTransportTransformerMessageAuthentication(sessionAuthKey.encoded))
-        }
-    }
-
     install(Authentication) {
-        session<UserSession>("auth-session") {
-            validate { session -> session.takeIf { it.authenticated } }
-            challenge { call.respond(io.ktor.http.HttpStatusCode.Unauthorized) }
+        jwt("auth-jwt") {
+            verifier(jwtService.verifier)
+            validate { credential ->
+                credential.payload.getClaim(JwtService.CLAIM_AUTHENTICATED).asBoolean()
+                    ?.takeIf { it }
+                    ?.let { JWTPrincipal(credential.payload) }
+            }
+            challenge { _, _ -> call.respond(io.ktor.http.HttpStatusCode.Unauthorized) }
         }
     }
 
     routing {
         get("/health") { call.respond(io.ktor.http.HttpStatusCode.OK) }
 
-        loginRoutes(config)
+        loginRoutes(config, jwtService)
 
-        authenticate("auth-session") {
+        authenticate("auth-jwt") {
             importRoutes(importService)
             activityRoutes(repository)
         }

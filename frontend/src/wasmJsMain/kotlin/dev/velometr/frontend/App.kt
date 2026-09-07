@@ -8,10 +8,10 @@ import androidx.compose.runtime.setValue
 
 @Composable
 fun App(api: ApiClient) {
-    var authenticated by remember { mutableStateOf(false) }
+    var authenticated by remember { mutableStateOf(api.isAuthenticated()) }
 
     if (authenticated) {
-        DashboardScreen(api = api)
+        DashboardScreen(api = api, onLoggedOut = { authenticated = false })
     } else {
         LoginScreen(api = api, onSuccess = { authenticated = true })
     }

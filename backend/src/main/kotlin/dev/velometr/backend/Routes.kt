@@ -10,17 +10,14 @@ import io.ktor.server.response.respond
 import io.ktor.server.routing.Route
 import io.ktor.server.routing.get
 import io.ktor.server.routing.post
-import io.ktor.server.sessions.sessions
-import io.ktor.server.sessions.set
 import io.ktor.utils.io.jvm.javaio.copyTo
 import java.io.File
 
-fun Route.loginRoutes(config: AppConfig) {
+fun Route.loginRoutes(config: AppConfig, jwtService: JwtService) {
     post("/api/login") {
         val request = call.receive<LoginRequest>()
         if (request.passcode == config.authPasscode) {
-            call.sessions.set(UserSession())
-            call.respond(HttpStatusCode.OK)
+            call.respond(LoginResponse(jwtService.issueToken()))
         } else {
             call.respond(HttpStatusCode.Unauthorized)
         }

@@ -2,11 +2,13 @@ package dev.velometr.frontend
 
 import io.ktor.client.HttpClient
 import io.ktor.client.call.body
+import io.ktor.client.plugins.HttpResponseValidator
 import io.ktor.client.plugins.contentnegotiation.ContentNegotiation
 import io.ktor.client.plugins.defaultRequest
 import io.ktor.client.request.forms.MultiPartFormDataContent
 import io.ktor.client.request.forms.formData
 import io.ktor.client.request.get
+import io.ktor.client.request.header
 import io.ktor.client.request.parameter
 import io.ktor.client.request.post
 import io.ktor.client.request.setBody
@@ -17,14 +19,24 @@ import io.ktor.http.Headers
 import io.ktor.http.URLProtocol
 import io.ktor.http.contentType
 import io.ktor.serialization.kotlinx.json.json
+import kotlinx.browser.localStorage
 import kotlinx.browser.window
 import kotlinx.serialization.json.Json
+
+/** Thrown when the backend rejects the stored token (missing, invalid, or issued by a previous process). */
+class UnauthorizedException : RuntimeException()
+
+private const val TOKEN_STORAGE_KEY = "velometr_token"
 
 /**
  * The frontend performs no computation of its own: every value shown on the
  * dashboard is exactly what one of these calls returns from the backend.
  */
 class ApiClient {
+    // No expiry on the token itself, so a stored value survives page reloads
+    // and browser restarts until the backend process (and its signing key) restarts.
+    private var token: String? = runCatching { localStorage.getItem(TOKEN_STORAGE_KEY) }.getOrNull()
+
     private val client = HttpClient {
         install(ContentNegotiation) {
             json(Json { ignoreUnknownKeys = true })
@@ -38,7 +50,20 @@ class ApiClient {
                 host = window.location.hostname
                 window.location.port.toIntOrNull()?.let { port = it }
             }
+            token?.let { header(HttpHeaders.Authorization, "Bearer $it") }
         }
+        HttpResponseValidator {
+            validateResponse { response ->
+                if (response.status == HttpStatusCode.Unauthorized) throw UnauthorizedException()
+            }
+        }
+    }
+
+    fun isAuthenticated(): Boolean = token != null
+
+    fun logout() {
+        token = null
+        runCatching { localStorage.removeItem(TOKEN_STORAGE_KEY) }
     }
 
     suspend fun login(passcode: String): Boolean {
@@ -46,7 +71,11 @@ class ApiClient {
             contentType(ContentType.Application.Json)
             setBody(LoginRequest(passcode))
         }
-        return response.status == HttpStatusCode.OK
+        if (response.status != HttpStatusCode.OK) return false
+        val issued = response.body<LoginResponse>().token
+        token = issued
+        runCatching { localStorage.setItem(TOKEN_STORAGE_KEY, issued) }
+        return true
     }
 
     suspend fun yearSummary(year: Int): YearSummaryDto =
