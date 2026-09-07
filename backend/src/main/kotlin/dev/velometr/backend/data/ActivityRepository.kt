@@ -100,11 +100,16 @@ class ActivityRepository(private val dataPath: String) {
     fun yearSummary(year: Int): YearSummaryDto {
         val rows = listYear(year)
         val total = rows.sumOf { it.distanceKm }
+        val firstMonday = LocalDate.of(year, 1, 1).with(TemporalAdjusters.previousOrSame(DayOfWeek.MONDAY))
+        val activeWeeks = rows
+            .map { (ChronoUnit.DAYS.between(firstMonday, LocalDateTime.parse(it.date).toLocalDate()) / 7).toInt() }
+            .toSet()
+            .size
         return YearSummaryDto(
             year = year,
             totalDistanceKm = total,
             tripCount = rows.size,
-            avgWeeklyDistanceKm = total / 52.0,
+            avgWeeklyDistanceKm = if (activeWeeks == 0) 0.0 else total / activeWeeks,
             longestTripKm = rows.maxOfOrNull { it.distanceKm } ?: 0.0,
         )
     }

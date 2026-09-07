@@ -12,4 +12,5 @@ object VelometrColors {
     val text = Color(0xFFEDEFEC)
     val textMuted = Color(0xFF8B958E)
     val textFaint = Color(0xFF57615B)
+    val cardSecondaryText = Color(0xFF6F7874)
 }

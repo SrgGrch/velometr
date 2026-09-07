@@ -5,6 +5,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -111,13 +112,17 @@ fun ImportModal(onClose: () -> Unit, onImport: suspend (ByteArray, String) -> Un
     }
 
     Box(
-        modifier = Modifier.fillMaxSize().background(Color(0xB8080A09)),
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xB8080A09))
+            .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClose),
         contentAlignment = Alignment.Center,
     ) {
         Column(
             modifier = Modifier
                 .widthIn(max = 420.dp)
                 .background(VelometrColors.panel, RoundedCornerShape(14.dp))
+                .clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = {})
                 .padding(26.dp),
         ) {
             Row(

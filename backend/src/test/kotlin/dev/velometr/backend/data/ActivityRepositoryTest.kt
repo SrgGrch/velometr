@@ -112,6 +112,60 @@ class ActivityRepositoryTest {
     }
 
     @Test
+    fun `year summary averages distance over distinct weeks with multiple trips in the same week`() {
+        val path = tempDbPath()
+        Database.migrate(path)
+        val repository = ActivityRepository(path)
+        repository.importBatch(
+            listOf(
+                // Both dates fall in the same Monday-Sunday calendar week.
+                sampleActivity(1L, distanceKm = 10.0).copy(date = "2026-06-01T10:00:00") to null,
+                sampleActivity(2L, distanceKm = 20.0).copy(date = "2026-06-03T10:00:00") to null,
+            )
+        )
+
+        val summary = repository.yearSummary(2026)
+
+        assertEquals(30.0, summary.avgWeeklyDistanceKm, 1e-9)
+    }
+
+    @Test
+    fun `year summary averages distance over distinct weeks with trips across separate weeks`() {
+        val path = tempDbPath()
+        Database.migrate(path)
+        val repository = ActivityRepository(path)
+        repository.importBatch(
+            listOf(
+                sampleActivity(1L, distanceKm = 10.0).copy(date = "2026-01-01T10:00:00") to null, // week 0
+                sampleActivity(2L, distanceKm = 20.0).copy(date = "2026-01-08T10:00:00") to null, // week 1
+            )
+        )
+
+        val summary = repository.yearSummary(2026)
+
+        assertEquals(15.0, summary.avgWeeklyDistanceKm, 1e-9)
+    }
+
+    @Test
+    fun `year summary counts a week containing only a zero-distance trip as active`() {
+        val path = tempDbPath()
+        Database.migrate(path)
+        val repository = ActivityRepository(path)
+        repository.importBatch(
+            listOf(
+                sampleActivity(1L, distanceKm = 0.0).copy(date = "2026-01-01T10:00:00") to null, // week 0
+                sampleActivity(2L, distanceKm = 20.0).copy(date = "2026-01-08T10:00:00") to null, // week 1
+            )
+        )
+
+        val summary = repository.yearSummary(2026)
+
+        // Divisor must be 2 (both weeks are active), not 1 (only the non-zero-distance bucket).
+        assertEquals(20.0, summary.totalDistanceKm, 1e-9)
+        assertEquals(10.0, summary.avgWeeklyDistanceKm, 1e-9)
+    }
+
+    @Test
     fun `weekly distances for a year with no activities is all zero buckets`() {
         val path = tempDbPath()
         Database.migrate(path)
