@@ -1,17 +1,4 @@
-# activity-dashboard Specification
-
-## Purpose
-
-Presents year-scoped mileage totals and the underlying trip list so the user can see their cycling volume at a glance, without opening Strava or counting manually.
-
-## Requirements
-
-### Requirement: Year selection scopes the dashboard
-The system SHALL let the user switch between calendar years, and SHALL scope the hero stats, weekly chart, and trip list to the selected year.
-
-#### Scenario: User switches year
-- **WHEN** the user selects a different calendar year
-- **THEN** the hero stats, weekly chart, and trip list all update to reflect only that year's activities
+## MODIFIED Requirements
 
 ### Requirement: Yearly hero stats
 The system SHALL display, for the selected year, the total distance, the number of trips, the average weekly distance, and the longest single trip's distance. The average weekly distance SHALL equal the selected year's total distance divided by the number of distinct calendar weeks that contain at least one trip, excluding weeks without trips from the divisor.
@@ -65,10 +52,3 @@ The system SHALL display the selected year's trips as individual cards (not a ta
 #### Scenario: Card selected
 - **WHEN** the user interacts with a trip card
 - **THEN** no separate detail screen is opened
-
-### Requirement: Server-computed aggregates
-The system SHALL compute weekly, monthly, seasonal, and yearly aggregates on the backend and expose them via REST endpoints, so the frontend only renders data it receives.
-
-#### Scenario: Client requests yearly aggregates
-- **WHEN** the frontend requests aggregate statistics for a year
-- **THEN** the backend returns the computed aggregates and the frontend performs no aggregation itself

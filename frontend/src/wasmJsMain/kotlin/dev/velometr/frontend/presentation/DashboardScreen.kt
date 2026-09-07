@@ -5,7 +5,6 @@ import dev.velometr.frontend.data.ApiClient
 import dev.velometr.frontend.data.YearSummaryDto
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -202,10 +201,10 @@ private val MONTH_LABELS = listOf(
 @Composable
 private fun WeeklyChart(weeks: List<Double>, year: Int) {
     val max = (weeks.maxOrNull() ?: 0.0).coerceAtLeast(0.001)
-    val scrollState = rememberScrollState()
     var selectedWeek by remember(weeks) { mutableStateOf<Int?>(null) }
     var hoveredWeek by remember(weeks) { mutableStateOf<Int?>(null) }
     val activeWeek = hoveredWeek ?: selectedWeek
+    val monthWeekCounts = remember(weeks, year) { weeksPerMonthCounts(year, weeks.size) }
 
     Column(
         Modifier
@@ -228,7 +227,7 @@ private fun WeeklyChart(weeks: List<Double>, year: Int) {
         }
         Spacer(Modifier.height(18.dp))
         Row(
-            modifier = Modifier.horizontalScroll(scrollState).height(120.dp).fillMaxWidth(),
+            modifier = Modifier.fillMaxWidth().height(120.dp),
             verticalAlignment = Alignment.Bottom,
             horizontalArrangement = Arrangement.spacedBy(3.dp),
         ) {
@@ -242,7 +241,7 @@ private fun WeeklyChart(weeks: List<Double>, year: Int) {
                 val isActive = index == activeWeek
                 Box(
                     modifier = Modifier
-                        .width(10.dp)
+                        .weight(1f)
                         .fillMaxHeight()
                         .hoverable(interactionSource)
                         .clickable(interactionSource = interactionSource, indication = null) {
@@ -255,7 +254,7 @@ private fun WeeklyChart(weeks: List<Double>, year: Int) {
                             .fillMaxWidth()
                             .fillMaxHeight(heightFraction)
                             .background(
-                                color = if (isActive || value > max * 0.86) VelometrColors.accent else VelometrColors.contour,
+                                color = if (isActive) VelometrColors.accent else VelometrColors.contour,
                                 shape = RoundedCornerShape(topStart = 2.dp, topEnd = 2.dp),
                             ),
                     )
@@ -263,9 +262,14 @@ private fun WeeklyChart(weeks: List<Double>, year: Int) {
             }
         }
         Spacer(Modifier.height(8.dp))
-        Row(modifier = Modifier.horizontalScroll(scrollState)) {
-            MONTH_LABELS.forEach { label ->
-                Text(label, color = VelometrColors.textFaint, fontSize = 11.sp, modifier = Modifier.width(60.dp))
+        Row(modifier = Modifier.fillMaxWidth()) {
+            MONTH_LABELS.forEachIndexed { index, label ->
+                Text(
+                    label,
+                    color = VelometrColors.textFaint,
+                    fontSize = 11.sp,
+                    modifier = Modifier.weight(monthWeekCounts[index].toFloat()),
+                )
             }
         }
     }
@@ -331,7 +335,7 @@ private fun TripCard(activity: ActivityDto, isPeak: Boolean, modifier: Modifier 
                         Spacer(Modifier.height(4.dp))
                         Text(
                             formatShortDate(activity.date),
-                            color = VelometrColors.textFaint,
+                            color = VelometrColors.cardSecondaryText,
                             fontSize = 12.sp,
                             fontFamily = FontFamily.Monospace,
                         )
@@ -362,6 +366,6 @@ private fun TripStat(value: String, label: String) {
     Column {
         Text(value, color = VelometrColors.text, fontFamily = FontFamily.Monospace, fontSize = 14.sp)
         Spacer(Modifier.height(2.dp))
-        Text(label, color = VelometrColors.textFaint, fontSize = 11.sp)
+        Text(label, color = VelometrColors.cardSecondaryText, fontSize = 11.sp)
     }
 }

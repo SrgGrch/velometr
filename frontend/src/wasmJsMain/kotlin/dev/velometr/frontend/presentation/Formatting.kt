@@ -71,6 +71,22 @@ fun weekRangeLabel(year: Int, weekIndex: Int): String {
     }
 }
 
+/** Number of weekly buckets (per [weekIndexOf]'s convention, [weekCount] entries starting
+ * Jan 1) whose start date falls in each calendar month, always 12 entries in January-December
+ * order. Lets month labels claim a proportional share of the chart's width matching the equal-
+ * width week bars beneath them, so both rows stay aligned without any fixed pixel widths. */
+fun weeksPerMonthCounts(year: Int, weekCount: Int): List<Int> {
+    val jan1 = LocalDate(year, 1, 1)
+    val firstMonday = jan1.minus(jan1.dayOfWeek.isoDayNumber - 1, DateTimeUnit.DAY)
+    val counts = IntArray(12)
+    for (weekIndex in 0 until weekCount) {
+        val weekStart = maxOf(jan1, firstMonday.plus(weekIndex * 7, DateTimeUnit.DAY))
+        val month = weekStart.toString().substring(5, 7).toInt()
+        counts[month - 1]++
+    }
+    return counts.toList()
+}
+
 /** ISO local date-time -> "d mmm" (e.g. "5 сен") */
 fun formatShortDate(isoDateTime: String): String {
     val datePart = isoDateTime.substringBefore('T')
