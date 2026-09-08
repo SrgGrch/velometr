@@ -21,6 +21,12 @@ kotlin {
                 outputFileName = "frontend.js"
                 devServer = (devServer ?: KotlinWebpackConfig.DevServer()).apply {
                     port = 8081
+                    proxy = mutableListOf(
+                        KotlinWebpackConfig.DevServer.Proxy(
+                            context = mutableListOf("/api"),
+                            target = "http://localhost:8080",
+                        )
+                    )
                 }
             }
         }
@@ -35,6 +41,9 @@ kotlin {
                 implementation(compose.material3)
                 implementation(compose.ui)
                 implementation("io.ktor:ktor-client-core:3.1.3")
+                implementation("org.jetbrains.compose.material3.adaptive:adaptive:1.2.0")
+                implementation("org.jetbrains.compose.material3.adaptive:adaptive-layout:1.2.0")
+                implementation("org.jetbrains.compose.material3.adaptive:adaptive-navigation:1.2.0")
                 implementation("io.ktor:ktor-client-js:3.1.3")
                 implementation("io.ktor:ktor-client-content-negotiation:3.1.3")
                 implementation("io.ktor:ktor-serialization-kotlinx-json:3.1.3")
