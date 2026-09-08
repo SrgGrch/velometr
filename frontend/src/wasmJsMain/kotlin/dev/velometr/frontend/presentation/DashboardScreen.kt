@@ -19,16 +19,17 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
 import androidx.compose.material3.adaptive.layout.AnimatedPane
 import androidx.compose.material3.adaptive.layout.SupportingPaneScaffold
 import androidx.compose.material3.adaptive.navigation.rememberSupportingPaneScaffoldNavigator
@@ -46,6 +47,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.window.core.layout.WindowSizeClass
 import dev.velometr.frontend.data.ActivityDto
 import dev.velometr.frontend.data.ApiClient
 import dev.velometr.frontend.data.YearSummaryDto
@@ -62,7 +64,17 @@ fun DashboardScreen(api: ApiClient, onLoggedOut: () -> Unit) {
 
     Box(Modifier.fillMaxSize().background(VelometrColors.background)) {
         BoxWithConstraints(modifier = Modifier.align(Alignment.TopCenter).widthIn(max = 1400.dp).fillMaxWidth()) {
-            val isNarrow = maxWidth < NARROW_BREAKPOINT
+            val windowSizeClass = currentWindowAdaptiveInfoV2().windowSizeClass
+            val isNarrow = !windowSizeClass.isWidthAtLeastBreakpoint(
+                WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND
+            )
+
+            val isShort = !windowSizeClass.isHeightAtLeastBreakpoint(
+                WindowSizeClass.HEIGHT_DP_EXPANDED_LOWER_BOUND
+            )
+
+            println("$isNarrow|$isShort")
+
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -81,27 +93,37 @@ fun DashboardScreen(api: ApiClient, onLoggedOut: () -> Unit) {
                 }
 
                 viewModel.data?.let { loaded ->
-                    SupportingPaneScaffold(
-                        directive = navigator.scaffoldDirective,
-                        value = navigator.scaffoldValue,
-                        mainPane = {
-                            AnimatedPane(Modifier.preferredWidth(0.3f)) {
-                                Column {
-                                    HeroBlock(loaded.summary, isNarrow)
-                                    Spacer(Modifier.height(24.dp))
-                                    WeeklyChart(loaded.weeks, viewModel.year)
+                    if (isNarrow || isShort) {
+                        TripList(loaded.activities, isNarrow, {
+                            Column {
+                                HeroBlock(loaded.summary, isNarrow)
+                                Spacer(Modifier.height(24.dp))
+                                WeeklyChart(loaded.weeks, viewModel.year)
+                            }
+                        })
+                    } else {
+                        SupportingPaneScaffold(
+                            directive = navigator.scaffoldDirective,
+                            value = navigator.scaffoldValue,
+                            mainPane = {
+                                AnimatedPane(Modifier.preferredWidth(0.3f)) {
+                                    Column {
+                                        HeroBlock(loaded.summary, isNarrow)
+                                        Spacer(Modifier.height(24.dp))
+                                        WeeklyChart(loaded.weeks, viewModel.year)
+                                    }
                                 }
+                            },
+                            supportingPane = {
+                                AnimatedPane(Modifier.preferredWidth(0.6f)) {
+//                                    Box(Modifier.verticalScroll(rememberScrollState())) {
+                                    TripList(loaded.activities, isNarrow, null)
+//                                    }
+                                }
+                            }
+                        )
 
-                            }
-                        },
-                        supportingPane = {
-                            AnimatedPane(Modifier.preferredWidth(0.6f)) {
-                                Box(Modifier.verticalScroll(rememberScrollState())) {
-                                    TripList(loaded.activities, isNarrow)
-                                }
-                            }
-                        }
-                    )
+                    }
                 }
             }
         }
@@ -314,15 +336,25 @@ private fun WeeklyChart(weeks: List<Double>, year: Int) {
 }
 
 @Composable
-private fun TripList(activities: List<ActivityDto>, isNarrow: Boolean) {
-    Column(Modifier.fillMaxWidth()) {
-        Text("Последние поездки", color = VelometrColors.textMuted, fontSize = 14.sp)
-        Spacer(Modifier.height(14.dp))
-        val maxDistance = activities.maxOfOrNull { it.distanceKm } ?: 0.0
-        val columns = if (isNarrow) 1 else 2
-        // activities arrives sorted newest-first, so groupBy's insertion-ordered keys keep weeks newest-first too.
-        val weekGroups = activities.groupBy { weekIndexOf(it.date) }
-        weekGroups.entries.forEachIndexed { index, (weekIndex, weekActivities) ->
+private fun TripList(
+    activities: List<ActivityDto>,
+    isNarrow: Boolean,
+    header: @Composable (() -> Unit)?
+) {
+    val weekGroups = remember(activities) { activities.groupBy { weekIndexOf(it.date) }.entries.toList() }// todo move grouping to VN
+    val columns = if (isNarrow) 1 else 2
+
+    LazyColumn {
+        header?.let { item { it() } }
+
+        item {
+            Column {
+                Text("Последние поездки", color = VelometrColors.textMuted, fontSize = 14.sp)
+                Spacer(Modifier.height(14.dp))
+            }
+        }
+
+        itemsIndexed(items = weekGroups) { index, (weekIndex, weekActivities) ->
             if (index != 0) Spacer(Modifier.height(20.dp))
             Text(
                 "Неделя ${weekIndex + 1}",
@@ -336,7 +368,6 @@ private fun TripList(activities: List<ActivityDto>, isNarrow: Boolean) {
                     row.forEach { activity ->
                         TripCard(
                             activity = activity,
-                            isPeak = activity.distanceKm > maxDistance * 0.8,
                             modifier = Modifier.weight(1f),
                         )
                     }
@@ -349,7 +380,7 @@ private fun TripList(activities: List<ActivityDto>, isNarrow: Boolean) {
 }
 
 @Composable
-private fun TripCard(activity: ActivityDto, isPeak: Boolean, modifier: Modifier = Modifier) {
+private fun TripCard(activity: ActivityDto, modifier: Modifier = Modifier) {
     // The caller's modifier (e.g. RowScope.weight) must land on SelectionContainer itself -
     // it's the direct child of the enclosing Row, whereas the inner Row here is not, so weight
     // applied there is silently dropped and starves the second card in a two-up row.
@@ -363,7 +394,7 @@ private fun TripCard(activity: ActivityDto, isPeak: Boolean, modifier: Modifier 
                 Modifier
                     .width(3.dp)
                     .fillMaxHeight()
-                    .background(if (isPeak) VelometrColors.accent else VelometrColors.contour),
+                    .background(VelometrColors.contour),
             )
             Spacer(Modifier.width(14.dp))
             Column(Modifier.fillMaxWidth()) {

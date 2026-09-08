@@ -19,3 +19,6 @@ package.json
 package-lock.json
 .agents/skills/complex-review/
 .claude/skills/playwright-cli/
+
+.idea/
+local.properties
