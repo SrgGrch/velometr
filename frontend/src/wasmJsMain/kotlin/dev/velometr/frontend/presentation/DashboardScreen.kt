@@ -52,9 +52,6 @@ import dev.velometr.frontend.data.ActivityDto
 import dev.velometr.frontend.data.ApiClient
 import dev.velometr.frontend.data.YearSummaryDto
 
-/** Below this content width the layout switches to the mockup's mobile arrangement (single-column trip grid, stacked header). */
-private val NARROW_BREAKPOINT = 840.dp
-
 @OptIn(ExperimentalMaterial3AdaptiveApi::class)
 @Composable
 fun DashboardScreen(api: ApiClient, onLoggedOut: () -> Unit) {
@@ -72,8 +69,6 @@ fun DashboardScreen(api: ApiClient, onLoggedOut: () -> Unit) {
             val isShort = !windowSizeClass.isHeightAtLeastBreakpoint(
                 WindowSizeClass.HEIGHT_DP_EXPANDED_LOWER_BOUND
             )
-
-            println("$isNarrow|$isShort")
 
             Column(
                 modifier = Modifier
@@ -116,9 +111,7 @@ fun DashboardScreen(api: ApiClient, onLoggedOut: () -> Unit) {
                             },
                             supportingPane = {
                                 AnimatedPane(Modifier.preferredWidth(0.6f)) {
-//                                    Box(Modifier.verticalScroll(rememberScrollState())) {
                                     TripList(loaded.activities, isNarrow, null)
-//                                    }
                                 }
                             }
                         )

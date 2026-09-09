@@ -66,6 +66,28 @@ The system SHALL display the selected year's trips as individual cards (not a ta
 - **WHEN** the user interacts with a trip card
 - **THEN** no separate detail screen is opened
 
+### Requirement: Adaptive two-pane layout on wide, tall viewports
+The system SHALL present the hero stats and weekly chart in a main pane alongside the trip list in an adjacent supporting pane, side by side, whenever the viewport is at least the medium width breakpoint (600dp) wide AND at least the expanded height breakpoint (900dp) tall. In this layout the trip list SHALL use a two-column card grid.
+
+#### Scenario: Viewport is both wide and tall
+- **WHEN** the viewport is at least 600dp wide and at least 900dp tall
+- **THEN** the hero stats and weekly chart render in a main pane, the trip list renders in an adjacent supporting pane, and the trip list uses a two-column card grid
+
+### Requirement: Collapsed single-column layout on narrow or short viewports
+The system SHALL collapse the dashboard to a single scrollable column — trip list with the hero stats and weekly chart as its header — whenever the viewport is narrower than the medium width breakpoint (600dp) or shorter than the expanded height breakpoint (900dp). The dashboard header (title, year controls, import button) SHALL stack into two rows only when the viewport is narrower than the medium width breakpoint; shortness alone SHALL NOT trigger header stacking. The trip list SHALL use a single-column card grid only when the viewport is narrower than the medium width breakpoint; a viewport that is merely short SHALL keep the two-column card grid.
+
+#### Scenario: Viewport is narrow or short
+- **WHEN** the viewport is narrower than 600dp or shorter than 900dp
+- **THEN** the dashboard renders as a single scrollable column with the hero stats and weekly chart shown above the trip list
+
+#### Scenario: Viewport is narrow
+- **WHEN** the viewport is narrower than 600dp
+- **THEN** the header stacks the title above a row containing the year controls and import button, and the trip list uses a single-column card grid
+
+#### Scenario: Viewport is short but not narrow
+- **WHEN** the viewport is at least 600dp wide but shorter than 900dp
+- **THEN** the header stays a single row and the trip list still uses a two-column card grid
+
 ### Requirement: Server-computed aggregates
 The system SHALL compute weekly, monthly, seasonal, and yearly aggregates on the backend and expose them via REST endpoints, so the frontend only renders data it receives.
 
