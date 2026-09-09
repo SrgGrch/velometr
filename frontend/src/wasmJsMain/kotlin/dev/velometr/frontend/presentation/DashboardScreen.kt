@@ -1,8 +1,5 @@
 package dev.velometr.frontend.presentation
 
-import dev.velometr.frontend.data.ActivityDto
-import dev.velometr.frontend.data.ApiClient
-import dev.velometr.frontend.data.YearSummaryDto
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.hoverable
@@ -12,6 +9,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -21,15 +19,20 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.selection.SelectionContainer
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
+import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
+import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
+import androidx.compose.material3.adaptive.layout.AnimatedPane
+import androidx.compose.material3.adaptive.layout.SupportingPaneScaffold
+import androidx.compose.material3.adaptive.navigation.rememberSupportingPaneScaffoldNavigator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -41,24 +44,35 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.window.core.layout.WindowSizeClass
+import dev.velometr.frontend.data.ActivityDto
+import dev.velometr.frontend.data.ApiClient
+import dev.velometr.frontend.data.YearSummaryDto
 
-/** Below this content width the layout switches to the mockup's mobile arrangement (single-column trip grid, stacked header). */
-private val NARROW_BREAKPOINT = 620.dp
-
+@OptIn(ExperimentalMaterial3AdaptiveApi::class)
 @Composable
 fun DashboardScreen(api: ApiClient, onLoggedOut: () -> Unit) {
     val scope = rememberCoroutineScope()
     val viewModel = remember { DashboardViewModel(api, scope, onLoggedOut) }
+    val navigator = rememberSupportingPaneScaffoldNavigator<Long>()
 
     Box(Modifier.fillMaxSize().background(VelometrColors.background)) {
-        BoxWithConstraints(modifier = Modifier.align(Alignment.TopCenter).widthIn(max = 900.dp).fillMaxWidth()) {
-            val isNarrow = maxWidth < NARROW_BREAKPOINT
+        BoxWithConstraints(modifier = Modifier.align(Alignment.TopCenter).widthIn(max = 1400.dp).fillMaxWidth()) {
+            val windowSizeClass = currentWindowAdaptiveInfoV2().windowSizeClass
+            val isNarrow = !windowSizeClass.isWidthAtLeastBreakpoint(
+                WindowSizeClass.WIDTH_DP_EXPANDED_LOWER_BOUND
+            )
+
+            val isShort = !windowSizeClass.isHeightAtLeastBreakpoint(
+                WindowSizeClass.HEIGHT_DP_EXPANDED_LOWER_BOUND
+            )
+
             Column(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .verticalScroll(rememberScrollState())
                     .padding(if (isNarrow) 16.dp else 24.dp),
             ) {
                 DashboardHeader(
@@ -72,12 +86,37 @@ fun DashboardScreen(api: ApiClient, onLoggedOut: () -> Unit) {
                     Text("Не удалось загрузить данные", color = VelometrColors.accent)
                     TextButton(onClick = viewModel::retry) { Text("Повторить") }
                 }
+
                 viewModel.data?.let { loaded ->
-                    HeroBlock(loaded.summary, isNarrow)
-                    Spacer(Modifier.height(24.dp))
-                    WeeklyChart(loaded.weeks, viewModel.year)
-                    Spacer(Modifier.height(30.dp))
-                    TripList(loaded.activities, isNarrow)
+                    if (isNarrow || (isShort && isNarrow)) {
+                        TripList(loaded.activities, isNarrow, {
+                            Column {
+                                HeroBlock(loaded.summary, isNarrow)
+                                Spacer(Modifier.height(24.dp))
+                                WeeklyChart(loaded.weeks, viewModel.year)
+                            }
+                        })
+                    } else {
+                        SupportingPaneScaffold(
+                            directive = navigator.scaffoldDirective,
+                            value = navigator.scaffoldValue,
+                            mainPane = {
+                                AnimatedPane(Modifier.preferredWidth(0.3f)) {
+                                    Column {
+                                        HeroBlock(loaded.summary, isNarrow)
+                                        Spacer(Modifier.height(24.dp))
+                                        WeeklyChart(loaded.weeks, viewModel.year)
+                                    }
+                                }
+                            },
+                            supportingPane = {
+                                AnimatedPane(Modifier.preferredWidth(0.6f)) {
+                                    TripList(loaded.activities, isNarrow, null)
+                                }
+                            }
+                        )
+
+                    }
                 }
             }
         }
@@ -95,18 +134,19 @@ fun DashboardScreen(api: ApiClient, onLoggedOut: () -> Unit) {
 private fun DashboardHeader(year: Int, isNarrow: Boolean, onYearChange: (Int) -> Unit, onImportClick: () -> Unit) {
     val yearControls: @Composable () -> Unit = {
         Row(verticalAlignment = Alignment.CenterVertically) {
+            if (year != currentYear()) {
+                TextButton(onClick = { onYearChange(currentYear()) }) {
+                    Text("Текущий год", color = VelometrColors.textMuted, fontSize = 12.sp)
+                }
+                Spacer(Modifier.width(6.dp))
+            }
+
             TextButton(onClick = { onYearChange(year - 1) }) {
                 Text("‹", color = VelometrColors.textFaint, fontSize = 16.sp)
             }
             Text(year.toString(), color = VelometrColors.text, fontFamily = FontFamily.Monospace, fontSize = 14.sp)
             TextButton(onClick = { onYearChange(year + 1) }) {
                 Text("›", color = VelometrColors.textFaint, fontSize = 16.sp)
-            }
-            if (year != currentYear()) {
-                Spacer(Modifier.width(6.dp))
-                TextButton(onClick = { onYearChange(currentYear()) }) {
-                    Text("Текущий год", color = VelometrColors.textMuted, fontSize = 12.sp)
-                }
             }
         }
     }
@@ -150,38 +190,40 @@ private fun DashboardHeader(year: Int, isNarrow: Boolean, onYearChange: (Int) ->
 
 @Composable
 private fun HeroBlock(summary: YearSummaryDto, isNarrow: Boolean) {
-    Column(Modifier.fillMaxWidth()) {
-        Text("Пробег за год", color = VelometrColors.textMuted, fontSize = 13.sp)
-        Spacer(Modifier.height(10.dp))
-        Row(verticalAlignment = Alignment.Bottom) {
-            Text(
-                text = formatOneDecimal(summary.totalDistanceKm),
-                color = VelometrColors.text,
-                fontSize = if (isNarrow) 42.sp else 56.sp,
-                fontWeight = FontWeight.SemiBold,
-                fontFamily = FontFamily.Monospace,
-            )
-            Spacer(Modifier.width(8.dp))
-            Text("км", color = VelometrColors.textMuted, fontSize = 22.sp)
-        }
-        Spacer(Modifier.height(20.dp))
-        if (isNarrow) {
-            Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+    SelectionContainer(Modifier.fillMaxWidth()) {
+        Column {
+            Text("Пробег за год", color = VelometrColors.textMuted, fontSize = 13.sp)
+            Spacer(Modifier.height(10.dp))
+            Row(verticalAlignment = Alignment.Bottom) {
+                Text(
+                    text = formatOneDecimal(summary.totalDistanceKm),
+                    color = VelometrColors.text,
+                    fontSize = if (isNarrow) 42.sp else 56.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    fontFamily = FontFamily.Monospace,
+                )
+                Spacer(Modifier.width(8.dp))
+                Text("км", color = VelometrColors.textMuted, fontSize = 22.sp)
+            }
+            Spacer(Modifier.height(20.dp))
+            if (isNarrow) {
+                Column(verticalArrangement = Arrangement.spacedBy(14.dp)) {
+                    Row(horizontalArrangement = Arrangement.spacedBy(34.dp)) {
+                        HeroStat(summary.tripCount.toString(), "поездок")
+                        HeroStat(formatOneDecimal(summary.avgWeeklyDistanceKm), "км в среднем за неделю")
+                    }
+                    HeroStat(formatOneDecimal(summary.longestTripKm), "км, самая длинная поездка")
+                }
+            } else {
                 Row(horizontalArrangement = Arrangement.spacedBy(34.dp)) {
                     HeroStat(summary.tripCount.toString(), "поездок")
                     HeroStat(formatOneDecimal(summary.avgWeeklyDistanceKm), "км в среднем за неделю")
+                    HeroStat(formatOneDecimal(summary.longestTripKm), "км, самая длинная поездка")
                 }
-                HeroStat(formatOneDecimal(summary.longestTripKm), "км, самая длинная поездка")
             }
-        } else {
-            Row(horizontalArrangement = Arrangement.spacedBy(34.dp)) {
-                HeroStat(summary.tripCount.toString(), "поездок")
-                HeroStat(formatOneDecimal(summary.avgWeeklyDistanceKm), "км в среднем за неделю")
-                HeroStat(formatOneDecimal(summary.longestTripKm), "км, самая длинная поездка")
-            }
+            Spacer(Modifier.height(26.dp))
+            HorizontalDivider(color = VelometrColors.line)
         }
-        Spacer(Modifier.height(26.dp))
-        HorizontalDivider(color = VelometrColors.line)
     }
 }
 
@@ -217,10 +259,21 @@ private fun WeeklyChart(weeks: List<Double>, year: Int) {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically,
         ) {
-            Text("Пробег по неделям", color = VelometrColors.textMuted, fontSize = 14.sp)
+            Text(
+                "Пробег по неделям",
+                color = VelometrColors.textMuted,
+                fontSize = 14.sp,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis,
+                modifier = Modifier.weight(1f, false),
+            )
+
+            Spacer(Modifier.width(4.dp))
+
             Text(
                 text = activeWeek?.let { "${weekRangeLabel(year, it)} · ${formatOneDecimal(weeks[it])} км" }.orEmpty(),
                 color = VelometrColors.text,
+                maxLines = 1,
                 fontFamily = FontFamily.Monospace,
                 fontSize = 13.sp,
             )
@@ -276,15 +329,25 @@ private fun WeeklyChart(weeks: List<Double>, year: Int) {
 }
 
 @Composable
-private fun TripList(activities: List<ActivityDto>, isNarrow: Boolean) {
-    Column(Modifier.fillMaxWidth()) {
-        Text("Последние поездки", color = VelometrColors.textMuted, fontSize = 14.sp)
-        Spacer(Modifier.height(14.dp))
-        val maxDistance = activities.maxOfOrNull { it.distanceKm } ?: 0.0
-        val columns = if (isNarrow) 1 else 2
-        // activities arrives sorted newest-first, so groupBy's insertion-ordered keys keep weeks newest-first too.
-        val weekGroups = activities.groupBy { weekIndexOf(it.date) }
-        weekGroups.entries.forEachIndexed { index, (weekIndex, weekActivities) ->
+private fun TripList(
+    activities: List<ActivityDto>,
+    isNarrow: Boolean,
+    header: @Composable (() -> Unit)?
+) {
+    val weekGroups = remember(activities) { activities.groupBy { weekIndexOf(it.date) }.entries.toList() }// todo move grouping to VN
+    val columns = if (isNarrow) 1 else 2
+
+    LazyColumn {
+        header?.let { item { it() } }
+
+        item {
+            Column {
+                Text("Последние поездки", color = VelometrColors.textMuted, fontSize = 14.sp)
+                Spacer(Modifier.height(14.dp))
+            }
+        }
+
+        itemsIndexed(items = weekGroups) { index, (weekIndex, weekActivities) ->
             if (index != 0) Spacer(Modifier.height(20.dp))
             Text(
                 "Неделя ${weekIndex + 1}",
@@ -298,7 +361,6 @@ private fun TripList(activities: List<ActivityDto>, isNarrow: Boolean) {
                     row.forEach { activity ->
                         TripCard(
                             activity = activity,
-                            isPeak = activity.distanceKm > maxDistance * 0.8,
                             modifier = Modifier.weight(1f),
                         )
                     }
@@ -311,7 +373,7 @@ private fun TripList(activities: List<ActivityDto>, isNarrow: Boolean) {
 }
 
 @Composable
-private fun TripCard(activity: ActivityDto, isPeak: Boolean, modifier: Modifier = Modifier) {
+private fun TripCard(activity: ActivityDto, modifier: Modifier = Modifier) {
     // The caller's modifier (e.g. RowScope.weight) must land on SelectionContainer itself -
     // it's the direct child of the enclosing Row, whereas the inner Row here is not, so weight
     // applied there is silently dropped and starves the second card in a two-up row.
@@ -325,11 +387,11 @@ private fun TripCard(activity: ActivityDto, isPeak: Boolean, modifier: Modifier 
                 Modifier
                     .width(3.dp)
                     .fillMaxHeight()
-                    .background(if (isPeak) VelometrColors.accent else VelometrColors.contour),
+                    .background(VelometrColors.contour),
             )
             Spacer(Modifier.width(14.dp))
             Column(Modifier.fillMaxWidth()) {
-                Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+                FlowRow(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                     Column {
                         Text(activity.title ?: "Поездка", color = VelometrColors.text, fontSize = 14.sp)
                         Spacer(Modifier.height(4.dp))
@@ -351,7 +413,7 @@ private fun TripCard(activity: ActivityDto, isPeak: Boolean, modifier: Modifier 
                 Spacer(Modifier.height(12.dp))
                 HorizontalDivider(color = VelometrColors.line)
                 Spacer(Modifier.height(12.dp))
-                Row(horizontalArrangement = Arrangement.spacedBy(22.dp)) {
+                FlowRow(horizontalArrangement = Arrangement.spacedBy(22.dp)) {
                     TripStat(formatDuration(activity.durationSec), "длительность")
                     TripStat(formatSpeed(activity.avgSpeed), "ср. скорость, км/ч")
                     TripStat(formatSpeed(activity.maxSpeed), "макс. скорость, км/ч")
