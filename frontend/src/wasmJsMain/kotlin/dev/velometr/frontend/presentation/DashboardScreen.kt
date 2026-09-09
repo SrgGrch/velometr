@@ -63,7 +63,7 @@ fun DashboardScreen(api: ApiClient, onLoggedOut: () -> Unit) {
         BoxWithConstraints(modifier = Modifier.align(Alignment.TopCenter).widthIn(max = 1400.dp).fillMaxWidth()) {
             val windowSizeClass = currentWindowAdaptiveInfoV2().windowSizeClass
             val isNarrow = !windowSizeClass.isWidthAtLeastBreakpoint(
-                WindowSizeClass.WIDTH_DP_MEDIUM_LOWER_BOUND
+                WindowSizeClass.WIDTH_DP_EXPANDED_LOWER_BOUND
             )
 
             val isShort = !windowSizeClass.isHeightAtLeastBreakpoint(
@@ -88,7 +88,7 @@ fun DashboardScreen(api: ApiClient, onLoggedOut: () -> Unit) {
                 }
 
                 viewModel.data?.let { loaded ->
-                    if (isNarrow || isShort) {
+                    if (isNarrow || (isShort && isNarrow)) {
                         TripList(loaded.activities, isNarrow, {
                             Column {
                                 HeroBlock(loaded.summary, isNarrow)
