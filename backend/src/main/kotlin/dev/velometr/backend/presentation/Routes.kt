@@ -2,11 +2,13 @@ package dev.velometr.backend.presentation
 
 import dev.velometr.backend.AppConfig
 import dev.velometr.backend.data.ActivityRepository
+import dev.velometr.backend.domain.GpxTrack
 import dev.velometr.backend.domain.ImportService
 import dev.velometr.backend.domain.InvalidArchiveException
 import dev.velometr.backend.domain.JwtService
 import dev.velometr.backend.domain.LoginRequest
 import dev.velometr.backend.domain.LoginResponse
+import dev.velometr.backend.domain.TrackDto
 import dev.velometr.backend.domain.WeeklyDistanceDto
 import io.ktor.http.HttpStatusCode
 import io.ktor.http.content.PartData
@@ -116,5 +118,18 @@ fun Route.activityRoutes(repository: ActivityRepository) {
             return@get
         }
         call.respond(WeeklyDistanceDto(year = year, weeks = repository.weeklyDistances(year)))
+    }
+
+    get("/api/activities/{id}/track") {
+        val id = call.parameters["id"]?.toLongOrNull()
+        if (id == null) {
+            call.respond(HttpStatusCode.BadRequest, "id path parameter must be numeric")
+            return@get
+        }
+        val points = GpxTrack.decode(repository.track(id))
+        call.respond(
+            if (points != null) TrackDto(available = true, points = points)
+            else TrackDto(available = false, points = emptyList())
+        )
     }
 }
