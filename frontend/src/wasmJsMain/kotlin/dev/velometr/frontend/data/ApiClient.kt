@@ -89,6 +89,9 @@ class ApiClient {
     suspend fun activities(year: Int): List<ActivityDto> =
         client.get("/api/activities") { parameter("year", year) }.body()
 
+    suspend fun track(id: Long): TrackDto =
+        client.get("/api/activities/$id/track").body()
+
     suspend fun importZip(bytes: ByteArray, filename: String): ImportStats {
         val response = client.post("/api/import") {
             setBody(

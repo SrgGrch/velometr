@@ -54,6 +54,7 @@ import androidx.window.core.layout.WindowSizeClass
 import dev.velometr.frontend.data.ActivityDto
 import dev.velometr.frontend.data.ApiClient
 import dev.velometr.frontend.data.YearSummaryDto
+import dev.velometr.frontend.presentation.map.ActivityMapView
 import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3AdaptiveApi::class)
@@ -73,56 +74,84 @@ fun DashboardScreen(api: ApiClient, onLoggedOut: () -> Unit) {
             val isShort = !windowSizeClass.isHeightAtLeastBreakpoint(
                 WindowSizeClass.HEIGHT_DP_EXPANDED_LOWER_BOUND
             )
+            val isSingleColumn = isNarrow || (isShort && isNarrow)
+            val openMapId = navigator.currentDestination?.contentKey
+            val closeMap: () -> Unit = { scope.launch { navigator.navigateBack() } }
 
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(if (isNarrow) 16.dp else 24.dp),
-            ) {
-                DashboardHeader(
-                    year = viewModel.year,
-                    isNarrow = isNarrow,
-                    onYearChange = viewModel::setYear,
-                    onImportClick = viewModel::openImportModal,
+            if (isSingleColumn && openMapId != null) {
+                // Narrow/short viewports: the map replaces the whole dashboard, not just the trip
+                // list, per the "Adaptive map placement" requirement - closing it returns here.
+                ActivityMapView(
+                    activityId = openMapId,
+                    api = api,
+                    onClose = closeMap,
+                    modifier = Modifier.fillMaxSize(),
                 )
-                Spacer(Modifier.height(24.dp))
-                if (viewModel.loadError) {
-                    Text("Не удалось загрузить данные", color = VelometrColors.accent)
-                    TextButton(onClick = viewModel::retry) { Text("Повторить") }
-                }
-
-                viewModel.data?.let { loaded ->
-                    val onCardClick: (Long) -> Unit = { id ->
-                        scope.launch { navigator.navigateTo(SupportingPaneScaffoldRole.Extra, id) }
+            } else {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(if (isNarrow) 16.dp else 24.dp),
+                ) {
+                    DashboardHeader(
+                        year = viewModel.year,
+                        isNarrow = isNarrow,
+                        onYearChange = viewModel::setYear,
+                        onImportClick = viewModel::openImportModal,
+                    )
+                    Spacer(Modifier.height(24.dp))
+                    if (viewModel.loadError) {
+                        Text("Не удалось загрузить данные", color = VelometrColors.accent)
+                        TextButton(onClick = viewModel::retry) { Text("Повторить") }
                     }
-                    if (isNarrow || (isShort && isNarrow)) {
-                        TripList(loaded.activities, isNarrow, onCardClick, {
-                            Column {
-                                HeroBlock(loaded.summary, isNarrow)
-                                Spacer(Modifier.height(24.dp))
-                                WeeklyChart(loaded.weeks, viewModel.year)
-                            }
-                        })
-                    } else {
-                        SupportingPaneScaffold(
-                            directive = navigator.scaffoldDirective,
-                            value = navigator.scaffoldValue,
-                            mainPane = {
-                                AnimatedPane(Modifier.preferredWidth(0.3f)) {
-                                    Column {
-                                        HeroBlock(loaded.summary, isNarrow)
-                                        Spacer(Modifier.height(24.dp))
-                                        WeeklyChart(loaded.weeks, viewModel.year)
-                                    }
-                                }
-                            },
-                            supportingPane = {
-                                AnimatedPane(Modifier.preferredWidth(0.6f)) {
-                                    TripList(loaded.activities, isNarrow, onCardClick, null)
-                                }
-                            }
-                        )
 
+                    viewModel.data?.let { loaded ->
+                        val onCardClick: (Long) -> Unit = { id ->
+                            scope.launch { navigator.navigateTo(SupportingPaneScaffoldRole.Extra, id) }
+                        }
+                        if (isSingleColumn) {
+                            TripList(loaded.activities, isNarrow, onCardClick, {
+                                Column {
+                                    HeroBlock(loaded.summary, isNarrow)
+                                    Spacer(Modifier.height(24.dp))
+                                    WeeklyChart(loaded.weeks, viewModel.year)
+                                }
+                            })
+                        } else {
+                            SupportingPaneScaffold(
+                                directive = navigator.scaffoldDirective,
+                                value = navigator.scaffoldValue,
+                                mainPane = {
+                                    AnimatedPane(Modifier.preferredWidth(0.3f)) {
+                                        Column {
+                                            HeroBlock(loaded.summary, isNarrow)
+                                            Spacer(Modifier.height(24.dp))
+                                            WeeklyChart(loaded.weeks, viewModel.year)
+                                        }
+                                    }
+                                },
+                                supportingPane = {
+                                    AnimatedPane(Modifier.preferredWidth(0.6f)) {
+                                        TripList(loaded.activities, isNarrow, onCardClick, null)
+                                    }
+                                },
+                                extraPane = {
+                                    // Wide/tall viewports: the map opens as a third pane
+                                    // alongside the two above, which stay visible per the same
+                                    // requirement's wide/tall scenario.
+                                    AnimatedPane(Modifier.preferredWidth(0.4f)) {
+                                        if (openMapId != null) {
+                                            ActivityMapView(
+                                                activityId = openMapId,
+                                                api = api,
+                                                onClose = closeMap,
+                                                modifier = Modifier.fillMaxSize(),
+                                            )
+                                        }
+                                    }
+                                },
+                            )
+                        }
                     }
                 }
             }
