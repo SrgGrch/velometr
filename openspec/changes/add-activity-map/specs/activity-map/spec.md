@@ -31,14 +31,14 @@ Clicking a trip card SHALL open a map view for that activity. When the activity 
 - **THEN** the map view opens showing a "no track available" state instead of a path
 
 ### Requirement: Adaptive map placement
-On viewports that qualify for the dashboard's two-pane adaptive layout (at least 600dp wide AND at least 900dp tall), the map view SHALL open in an additional pane alongside the existing dashboard panes, leaving the dashboard visible and interactive. On narrower or shorter viewports, the map view SHALL open as a separate full screen that replaces the dashboard until dismissed. In both placements, the map view SHALL provide a way to close it and return to the prior view.
+On a viewport that satisfies the dashboard's existing two-pane adaptive layout condition (the same `isNarrow`/`isShort` classification the dashboard already uses to choose between its two-pane and single-column layouts), the map view SHALL open in an additional pane alongside the existing dashboard panes, leaving the dashboard visible and interactive. On a viewport where that condition is not met (narrow or short), the map view SHALL open as a separate full screen that replaces the dashboard until dismissed. In both placements, the map view SHALL provide a way to close it and return to the prior view.
 
 #### Scenario: Wide and tall viewport
-- **WHEN** the viewport is at least 600dp wide and at least 900dp tall and the user clicks a trip card
+- **WHEN** the viewport satisfies the dashboard's two-pane layout condition (not narrow and not short) and the user clicks a trip card
 - **THEN** the map view opens in an additional pane alongside the dashboard's existing panes, and the dashboard remains visible
 
 #### Scenario: Narrow or short viewport
-- **WHEN** the viewport is narrower than 600dp or shorter than 900dp and the user clicks a trip card
+- **WHEN** the viewport does not satisfy the dashboard's two-pane layout condition (narrow or short) and the user clicks a trip card
 - **THEN** the map view opens as a separate full screen replacing the dashboard
 
 #### Scenario: Closing the map view
