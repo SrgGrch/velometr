@@ -53,5 +53,10 @@ kotlin {
                 implementation("ovh.plrapps:mapcompose-mp:1.1.3")
             }
         }
+        val wasmJsTest by getting {
+            dependencies {
+                implementation(kotlin("test"))
+            }
+        }
     }
 }

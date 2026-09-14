@@ -33,3 +33,9 @@ data class WeeklyDistanceDto(val year: Int, val weeks: List<Double>)
 
 @Serializable
 data class ImportStats(val imported: Int, val skipped: Int, val total: Int)
+
+@Serializable
+data class TrackPointDto(val lat: Double, val lon: Double)
+
+@Serializable
+data class TrackDto(val available: Boolean, val points: List<TrackPointDto>)
