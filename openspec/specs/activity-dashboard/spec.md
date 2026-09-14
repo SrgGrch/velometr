@@ -56,15 +56,15 @@ The system SHALL display a 52-week bar chart of distance per week for the select
 - **THEN** the hovered week's accent and details are shown, and the selected week's state is restored after the pointer leaves
 
 ### Requirement: Trip list as cards
-The system SHALL display the selected year's trips as individual cards (not a table), each showing the trip's title, date, distance, duration, average speed, and max speed. Dates and statistic labels on every card SHALL use color `#6F7874`. The system SHALL NOT provide a trip detail view.
+The system SHALL display the selected year's trips as individual cards (not a table), each showing the trip's title, date, distance, duration, average speed, and max speed. Dates and statistic labels on every card SHALL use color `#6F7874`. Clicking a card SHALL open that trip's map view (see the `activity-map` capability). The system SHALL NOT provide any other trip detail view.
 
 #### Scenario: Year has trips
 - **WHEN** the selected year has imported activities
 - **THEN** each is rendered as a card showing title, date, distance, duration, average speed, and max speed, with its date and statistic labels colored `#6F7874`
 
 #### Scenario: Card selected
-- **WHEN** the user interacts with a trip card
-- **THEN** no separate detail screen is opened
+- **WHEN** the user clicks a trip card
+- **THEN** that trip's map view opens and no other detail screen is shown
 
 ### Requirement: Adaptive two-pane layout on wide, tall viewports
 The system SHALL present the hero stats and weekly chart in a main pane alongside the trip list in an adjacent supporting pane, side by side, whenever the viewport is at least the medium width breakpoint (600dp) wide AND at least the expanded height breakpoint (900dp) tall. In this layout the trip list SHALL use a two-column card grid.

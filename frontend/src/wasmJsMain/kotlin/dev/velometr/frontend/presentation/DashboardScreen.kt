@@ -2,6 +2,7 @@ package dev.velometr.frontend.presentation
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.hoverable
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsHoveredAsState
@@ -32,6 +33,7 @@ import androidx.compose.material3.adaptive.ExperimentalMaterial3AdaptiveApi
 import androidx.compose.material3.adaptive.currentWindowAdaptiveInfoV2
 import androidx.compose.material3.adaptive.layout.AnimatedPane
 import androidx.compose.material3.adaptive.layout.SupportingPaneScaffold
+import androidx.compose.material3.adaptive.layout.SupportingPaneScaffoldRole
 import androidx.compose.material3.adaptive.navigation.rememberSupportingPaneScaffoldNavigator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -42,6 +44,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
@@ -51,6 +54,8 @@ import androidx.window.core.layout.WindowSizeClass
 import dev.velometr.frontend.data.ActivityDto
 import dev.velometr.frontend.data.ApiClient
 import dev.velometr.frontend.data.YearSummaryDto
+import dev.velometr.frontend.presentation.map.ActivityMapView
+import kotlinx.coroutines.launch
 
 @OptIn(ExperimentalMaterial3AdaptiveApi::class)
 @Composable
@@ -69,53 +74,84 @@ fun DashboardScreen(api: ApiClient, onLoggedOut: () -> Unit) {
             val isShort = !windowSizeClass.isHeightAtLeastBreakpoint(
                 WindowSizeClass.HEIGHT_DP_EXPANDED_LOWER_BOUND
             )
+            val isSingleColumn = isNarrow || (isShort && isNarrow)
+            val openMapId = navigator.currentDestination?.contentKey
+            val closeMap: () -> Unit = { scope.launch { navigator.navigateBack() } }
 
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(if (isNarrow) 16.dp else 24.dp),
-            ) {
-                DashboardHeader(
-                    year = viewModel.year,
-                    isNarrow = isNarrow,
-                    onYearChange = viewModel::setYear,
-                    onImportClick = viewModel::openImportModal,
+            if (isSingleColumn && openMapId != null) {
+                // Narrow/short viewports: the map replaces the whole dashboard, not just the trip
+                // list, per the "Adaptive map placement" requirement - closing it returns here.
+                ActivityMapView(
+                    activityId = openMapId,
+                    api = api,
+                    onClose = closeMap,
+                    modifier = Modifier.fillMaxSize(),
                 )
-                Spacer(Modifier.height(24.dp))
-                if (viewModel.loadError) {
-                    Text("Не удалось загрузить данные", color = VelometrColors.accent)
-                    TextButton(onClick = viewModel::retry) { Text("Повторить") }
-                }
+            } else {
+                Column(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(if (isNarrow) 16.dp else 24.dp),
+                ) {
+                    DashboardHeader(
+                        year = viewModel.year,
+                        isNarrow = isNarrow,
+                        onYearChange = viewModel::setYear,
+                        onImportClick = viewModel::openImportModal,
+                    )
+                    Spacer(Modifier.height(24.dp))
+                    if (viewModel.loadError) {
+                        Text("Не удалось загрузить данные", color = VelometrColors.accent)
+                        TextButton(onClick = viewModel::retry) { Text("Повторить") }
+                    }
 
-                viewModel.data?.let { loaded ->
-                    if (isNarrow || (isShort && isNarrow)) {
-                        TripList(loaded.activities, isNarrow, {
-                            Column {
-                                HeroBlock(loaded.summary, isNarrow)
-                                Spacer(Modifier.height(24.dp))
-                                WeeklyChart(loaded.weeks, viewModel.year)
-                            }
-                        })
-                    } else {
-                        SupportingPaneScaffold(
-                            directive = navigator.scaffoldDirective,
-                            value = navigator.scaffoldValue,
-                            mainPane = {
-                                AnimatedPane(Modifier.preferredWidth(0.3f)) {
-                                    Column {
-                                        HeroBlock(loaded.summary, isNarrow)
-                                        Spacer(Modifier.height(24.dp))
-                                        WeeklyChart(loaded.weeks, viewModel.year)
+                    viewModel.data?.let { loaded ->
+                        val onCardClick: (Long) -> Unit = { id ->
+                            scope.launch { navigator.navigateTo(SupportingPaneScaffoldRole.Extra, id) }
+                        }
+                        if (isSingleColumn) {
+                            TripList(loaded.activities, isNarrow, onCardClick, {
+                                Column {
+                                    HeroBlock(loaded.summary, isNarrow)
+                                    Spacer(Modifier.height(24.dp))
+                                    WeeklyChart(loaded.weeks, viewModel.year)
+                                }
+                            })
+                        } else {
+                            SupportingPaneScaffold(
+                                directive = navigator.scaffoldDirective,
+                                value = navigator.scaffoldValue,
+                                mainPane = {
+                                    AnimatedPane(Modifier.preferredWidth(0.3f)) {
+                                        Column {
+                                            HeroBlock(loaded.summary, isNarrow)
+                                            Spacer(Modifier.height(24.dp))
+                                            WeeklyChart(loaded.weeks, viewModel.year)
+                                        }
                                     }
-                                }
-                            },
-                            supportingPane = {
-                                AnimatedPane(Modifier.preferredWidth(0.6f)) {
-                                    TripList(loaded.activities, isNarrow, null)
-                                }
-                            }
-                        )
-
+                                },
+                                supportingPane = {
+                                    AnimatedPane(Modifier.preferredWidth(0.6f)) {
+                                        TripList(loaded.activities, isNarrow, onCardClick, null)
+                                    }
+                                },
+                                extraPane = {
+                                    // Wide/tall viewports: the map opens as a third pane
+                                    // alongside the two above, which stay visible per the same
+                                    // requirement's wide/tall scenario.
+                                    AnimatedPane(Modifier.preferredWidth(0.4f)) {
+                                        if (openMapId != null) {
+                                            ActivityMapView(
+                                                activityId = openMapId,
+                                                api = api,
+                                                onClose = closeMap,
+                                                modifier = Modifier.fillMaxSize(),
+                                            )
+                                        }
+                                    }
+                                },
+                            )
+                        }
                     }
                 }
             }
@@ -332,6 +368,7 @@ private fun WeeklyChart(weeks: List<Double>, year: Int) {
 private fun TripList(
     activities: List<ActivityDto>,
     isNarrow: Boolean,
+    onCardClick: (Long) -> Unit,
     header: @Composable (() -> Unit)?
 ) {
     val weekGroups = remember(activities) { activities.groupBy { weekIndexOf(it.date) }.entries.toList() }// todo move grouping to VN
@@ -362,6 +399,7 @@ private fun TripList(
                         TripCard(
                             activity = activity,
                             modifier = Modifier.weight(1f),
+                            onClick = { onCardClick(activity.id) },
                         )
                     }
                     if (columns == 2 && row.size == 1) Spacer(Modifier.weight(1f))
@@ -373,7 +411,7 @@ private fun TripList(
 }
 
 @Composable
-private fun TripCard(activity: ActivityDto, modifier: Modifier = Modifier) {
+private fun TripCard(activity: ActivityDto, modifier: Modifier = Modifier, onClick: () -> Unit) {
     // The caller's modifier (e.g. RowScope.weight) must land on SelectionContainer itself -
     // it's the direct child of the enclosing Row, whereas the inner Row here is not, so weight
     // applied there is silently dropped and starves the second card in a two-up row.
@@ -381,6 +419,7 @@ private fun TripCard(activity: ActivityDto, modifier: Modifier = Modifier) {
         Row(
             modifier = Modifier
                 .background(VelometrColors.panel, RoundedCornerShape(10.dp))
+                .pointerInput(onClick) { detectTapGestures(onTap = { onClick() }) }
                 .padding(vertical = 16.dp, horizontal = 18.dp),
         ) {
             Box(

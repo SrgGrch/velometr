@@ -6,6 +6,7 @@ import dev.velometr.backend.data.ImportStats
 import dev.velometr.backend.domain.ActivityDto
 import dev.velometr.backend.domain.LoginResponse
 import dev.velometr.backend.domain.ParsedActivity
+import dev.velometr.backend.domain.TrackDto
 import dev.velometr.backend.domain.WeeklyDistanceDto
 import dev.velometr.backend.domain.YearSummaryDto
 import io.ktor.client.request.forms.formData
@@ -24,11 +25,13 @@ import io.ktor.server.testing.testApplication
 import kotlinx.serialization.json.Json
 import java.io.ByteArrayOutputStream
 import java.nio.file.Files
+import java.util.zip.GZIPOutputStream
 import java.util.zip.ZipEntry
 import java.util.zip.ZipOutputStream
 import kotlin.test.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertTrue
 
 class ApplicationTest {
 
@@ -38,6 +41,23 @@ class ApplicationTest {
     }
 
     private fun config(dbPath: String) = AppConfig(dataPath = dbPath, authPasscode = "secret123", port = 0)
+
+    private fun gzip(bytes: ByteArray): ByteArray =
+        ByteArrayOutputStream().also { buffer ->
+            GZIPOutputStream(buffer).use { it.write(bytes) }
+        }.toByteArray()
+
+    private val sampleGpxBytes = gzip(
+        """
+        <?xml version="1.0" encoding="UTF-8"?>
+        <gpx version="1.1" creator="test">
+          <trk><trkseg>
+            <trkpt lat="55.751244" lon="37.618423"></trkpt>
+          </trkseg></trk>
+        </gpx>
+        """.trimIndent().toByteArray()
+    )
+
 
     @Test
     fun `health check responds without authentication`() = testApplication {
@@ -154,5 +174,49 @@ class ApplicationTest {
         assertEquals(HttpStatusCode.OK, response.status)
         val stats = Json.decodeFromString<ImportStats>(response.bodyAsText())
         assertEquals(1, stats.imported)
+    }
+
+    @Test
+    fun `track endpoint reports a decoded GPX track, no track, a non-GPX track, and an unknown id`() = testApplication {
+        val dbPath = tempDbPath()
+        Database.migrate(dbPath)
+        val repository = ActivityRepository(dbPath)
+        repository.importBatch(
+            listOf(
+                ParsedActivity(1, "2026-01-05T10:00:00", "GPX ride", 10.0, 3600, 10.0, 15.0, null) to sampleGpxBytes,
+                ParsedActivity(2, "2026-01-06T10:00:00", "No track ride", 5.0, 1800, 9.0, 12.0, null) to null,
+                ParsedActivity(3, "2026-01-07T10:00:00", "FIT-only ride", 8.0, 2400, 11.0, 14.0, null) to gzip(byteArrayOf(0x0E, 0x10, 0x2E, 0x46, 0x49, 0x54)),
+            )
+        )
+        application { module(config(dbPath)) }
+
+        val login = client.post("/api/login") {
+            contentType(ContentType.Application.Json)
+            setBody("""{"passcode":"secret123"}""")
+        }
+        val token = Json.decodeFromString<LoginResponse>(login.bodyAsText()).token
+
+        suspend fun trackFor(id: Long): TrackDto {
+            val response = client.get("/api/activities/$id/track") { header(HttpHeaders.Authorization, "Bearer $token") }
+            assertEquals(HttpStatusCode.OK, response.status)
+            return Json.decodeFromString<TrackDto>(response.bodyAsText())
+        }
+
+        val gpxTrack = trackFor(1)
+        assertTrue(gpxTrack.available)
+        assertEquals(1, gpxTrack.points.size)
+        assertEquals(55.751244, gpxTrack.points.single().lat, 1e-9)
+
+        val noTrack = trackFor(2)
+        assertFalse(noTrack.available)
+        assertTrue(noTrack.points.isEmpty())
+
+        val nonGpxTrack = trackFor(3)
+        assertFalse(nonGpxTrack.available)
+        assertTrue(nonGpxTrack.points.isEmpty())
+
+        val unknownIdTrack = trackFor(999)
+        assertFalse(unknownIdTrack.available)
+        assertTrue(unknownIdTrack.points.isEmpty())
     }
 }
