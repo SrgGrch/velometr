@@ -31,7 +31,7 @@ Decisions below are fixed design decisions from `openspec/changes/archive/2026-0
 - **Deployment:** `docker compose up` with two services — `backend` (Ktor) and `frontend` (nginx serving the compiled wasmJs static bundle, proxying `/api/*` to `backend` over the compose-internal network).
 - **Import flow:** user uploads the whole Strava export zip in one shot (drag-and-drop or file picker) → backend unzips it, streams-parses `activities.csv` entry-by-entry (avoid loading the whole archive into memory for large multi-year exports), upserts each row with `INSERT OR IGNORE` on `id`, and attaches a matching track file if present. Import must be safely repeatable — re-uploading the same or an overlapping archive must never create duplicates.
 
-Explicitly out of scope: a trip detail screen, map/track visualization, direct Strava API integration, automatic sync, and multi-user/sharing support.
+Explicitly out of scope: a trip detail screen beyond the map view, direct Strava API integration, automatic sync, and multi-user/sharing support.
 
 ## Git workflow
 
