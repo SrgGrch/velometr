@@ -50,6 +50,7 @@ kotlin {
                 implementation("org.jetbrains.kotlinx:kotlinx-serialization-json:1.7.3")
                 implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.8.0")
                 implementation("org.jetbrains.kotlinx:kotlinx-browser:0.3.1")
+                implementation("ovh.plrapps:mapcompose-mp:1.1.3")
             }
         }
     }
