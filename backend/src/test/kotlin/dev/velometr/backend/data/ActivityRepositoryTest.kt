@@ -3,7 +3,9 @@ package dev.velometr.backend.data
 import dev.velometr.backend.domain.ParsedActivity
 import java.nio.file.Files
 import kotlin.test.Test
+import kotlin.test.assertContentEquals
 import kotlin.test.assertEquals
+import kotlin.test.assertNull
 import kotlin.test.assertTrue
 
 class ActivityRepositoryTest {
@@ -218,6 +220,39 @@ class ActivityRepositoryTest {
 
         assertEquals(4.0, weeks2025.last(), 1e-9)
         assertEquals(6.0, weeks2026[0], 1e-9)
+    }
+
+    @Test
+    fun `list and stats reads exclude track_gpx while the single-row lookup returns it`() {
+        val path = tempDbPath()
+        Database.migrate(path)
+        val repository = ActivityRepository(path)
+        val trackBytes = "gzipped-track-bytes".toByteArray()
+        repository.importBatch(listOf(sampleActivity(1L) to trackBytes))
+
+        assertContentEquals(trackBytes, repository.track(1L))
+        // listYear's ActivityDto has no track field at all, so this is a compile-time
+        // guarantee, not just a runtime check - included here for documentation.
+        assertTrue(repository.listYear(2026).single().id == 1L)
+    }
+
+    @Test
+    fun `single-row track lookup returns null for an unknown id`() {
+        val path = tempDbPath()
+        Database.migrate(path)
+        val repository = ActivityRepository(path)
+
+        assertNull(repository.track(999L))
+    }
+
+    @Test
+    fun `single-row track lookup returns null when the activity has no stored track`() {
+        val path = tempDbPath()
+        Database.migrate(path)
+        val repository = ActivityRepository(path)
+        repository.importBatch(listOf(sampleActivity(1L) to null))
+
+        assertNull(repository.track(1L))
     }
 
     @Test

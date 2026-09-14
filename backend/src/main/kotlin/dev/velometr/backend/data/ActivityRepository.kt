@@ -97,6 +97,18 @@ class ActivityRepository(private val dataPath: String) {
         }
     }
 
+    /** Single-row lookup of the raw track_gpx BLOB, kept off the list/stats query paths above. */
+    fun track(id: Long): ByteArray? {
+        return connection().use { conn ->
+            conn.prepareStatement("SELECT track_gpx FROM activities WHERE id = ?").use { stmt ->
+                stmt.setLong(1, id)
+                stmt.executeQuery().use { rs ->
+                    if (!rs.next()) null else rs.getBytes("track_gpx")
+                }
+            }
+        }
+    }
+
     fun yearSummary(year: Int): YearSummaryDto {
         val rows = listYear(year)
         val total = rows.sumOf { it.distanceKm }
